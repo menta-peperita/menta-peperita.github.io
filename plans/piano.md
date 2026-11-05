@@ -26,6 +26,7 @@ Vue 3 + Vite (PWA) su GitHub Pages → API Google Apps Script (bound al Google S
 | Chiamate API | POST text/plain | evita il preflight CORS di Apps Script |
 | Riferimenti utente | per id, non per nome | rinominare non rompe lo storico |
 | Animazioni | `web/src/motion.css` + `<Transition>` Vue, solo transform/opacity | fluide, rispettano "riduci movimento" |
+| Messaggi Instagram | copia testo negli appunti + menu di condivisione con la foto; l'utente sceglie chat e incolla | Instagram ignora il testo condiviso e non accetta messaggi precompilati dal web |
 | Commit | autore "Menta Peperita" | nessuna email personale pubblica |
 | Versioni npm | fissate, pubblicate da ≥ 14 giorni | sicurezza supply chain |
 
@@ -36,4 +37,4 @@ Vue 3 + Vite (PWA) su GitHub Pages → API Google Apps Script (bound al Google S
 ## Avanzamento
 | Fase | Stato |
 |---|---|
-| 0 | login PC verificato; manca prova telefono |
+| 0 | completata: login PC e telefono, API, Pages; Instagram via appunti |
