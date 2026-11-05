@@ -1,13 +1,13 @@
 import { ref, watch } from 'vue'
 import { call } from './api'
-import { token, isValid, logout } from './auth'
+import { token, sessione, autenticato, logout } from './auth'
 
 export const me = ref(null)
 export const loading = ref(false)
 export const error = ref('')
 
 export async function loadMe() {
-  if (!isValid()) return
+  if (!autenticato()) return
   loading.value = true
   error.value = ''
   try { me.value = await call('whoami') }
@@ -15,9 +15,13 @@ export async function loadMe() {
   finally { loading.value = false }
 }
 
-export function esci() { logout(); me.value = null }
+export function esci() {
+  if (sessione.value) call('auth.esci', { sessione: sessione.value }).catch(() => {})
+  logout()
+  me.value = null
+}
 
-watch(token, (t, prev) => {
-  if (!t) me.value = null
-  else if (!me.value && t !== prev) loadMe()
+watch([token, sessione], () => {
+  if (!autenticato()) me.value = null
+  else if (!me.value) loadMe()
 })

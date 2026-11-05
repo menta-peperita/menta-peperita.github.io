@@ -62,8 +62,18 @@ export function ensureFresh() {
 
 export function expire() { setToken('') }
 
+// Sessione per l'accesso con codice via email o password (60 giorni, salvata sul dispositivo)
+const SKEY = 'mp_sessione'
+export const sessione = ref(localStorage.getItem(SKEY) || '')
+export function setSessione(t) {
+  sessione.value = t
+  try { if (t) localStorage.setItem(SKEY, t); else localStorage.removeItem(SKEY) } catch {}
+}
+export const autenticato = () => !!sessione.value || isValid()
+
 export function logout() {
   setToken('')
+  setSessione('')
   window.google?.accounts?.id?.disableAutoSelect()
 }
 

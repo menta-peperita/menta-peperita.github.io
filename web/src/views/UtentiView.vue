@@ -3,6 +3,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { utenti, caricaUtenti, salvaUtente, eliminaUtente, iniziali } from '../utenti'
 import { me } from '../session'
 import { notify } from '../toast'
+import { call } from '../api'
 import Icona from '../components/Icona.vue'
 
 const loading = ref(true)
@@ -14,6 +15,18 @@ const errori = ref({})
 const puoGestire = computed(() => me.value.ruolo === 'Titolare')
 const ordinati = computed(() => [...utenti.value].sort((a, b) => (b.attivo - a.attivo) || a.nome.localeCompare(b.nome, 'it')))
 const isMe = computed(() => form.id && form.id === me.value.id)
+const pw = reactive({ nuova: '', conferma: '', errore: '', salvando: false })
+async function salvaPassword() {
+  pw.errore = ''
+  if (pw.nuova !== pw.conferma) { pw.errore = 'Le due password non coincidono'; return }
+  pw.salvando = true
+  try {
+    await call('auth.imposta_password', { password: pw.nuova })
+    me.value = { ...me.value, haPassword: true }
+    pw.nuova = ''; pw.conferma = ''
+    notify('Password impostata')
+  } catch (e) { pw.errore = e.message } finally { pw.salvando = false }
+}
 
 onMounted(async () => {
   try { await caricaUtenti(true) } catch (e) { errore.value = e.message } finally { loading.value = false }
@@ -57,7 +70,18 @@ async function salva() {
       <h1 class="title">Utenti</h1>
       <button v-if="puoGestire" class="btn" @click="apri()"><Icona nome="piu" :size="18" /> Nuovo</button>
     </div>
-    <p class="muted hint">Chi entra nell&rsquo;app con l&rsquo;account Google indicato qui. Finch&eacute; l&rsquo;app &egrave; in prova, aggiungi la stessa email anche tra gli utenti di test di Google.</p>
+    <p class="muted hint">Possono entrare solo le email elencate qui: con Google, con un codice via email o con la password. Per entrare con Google l&rsquo;email va aggiunta anche tra gli utenti di test di Google; per codice e password non serve.</p>
+
+    <form class="card form" @submit.prevent="salvaPassword">
+      <div class="head-row"><h2 class="h2">La tua password</h2><span class="badge" :class="me.haPassword ? 'ok' : ''">{{ me.haPassword ? 'Impostata' : 'Non impostata' }}</span></div>
+      <small class="muted">Serve per entrare con email e password. Almeno 8 caratteri, con lettere e numeri.</small>
+      <div class="grid2">
+        <input v-model="pw.nuova" type="password" autocomplete="new-password" placeholder="Nuova password" aria-label="Nuova password">
+        <input v-model="pw.conferma" type="password" autocomplete="new-password" placeholder="Ripeti" aria-label="Ripeti password">
+      </div>
+      <small v-if="pw.errore" class="error">{{ pw.errore }}</small>
+      <button class="btn ghost" :disabled="pw.salvando || !pw.nuova">{{ me.haPassword ? 'Cambia password' : 'Imposta password' }}</button>
+    </form>
 
     <div v-if="loading" class="col">
       <div v-for="i in 3" :key="i" class="skeleton" style="height: 64px"></div>

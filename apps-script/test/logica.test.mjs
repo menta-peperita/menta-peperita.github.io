@@ -58,7 +58,7 @@ test('valori booleani dal foglio', () => {
 })
 test('utente pubblico normalizza email e attivo', () => {
   assert.deepEqual(plain(ctx.publicUser({ id: 'u2', nome: 'M', email: ' M@X.it', ruolo: 'Socia', attivo: 'TRUE', _row: 3 })),
-    { id: 'u2', nome: 'M', email: 'm@x.it', ruolo: 'Titolare', attivo: true })
+    { id: 'u2', nome: 'M', email: 'm@x.it', ruolo: 'Titolare', attivo: true, haPassword: false })
 })
 test('utente senza dati collegati si puo eliminare', () => {
   const tables = {
@@ -100,4 +100,16 @@ test('righe ordine', () => {
 })
 test('riferimenti a un elemento', () => {
   assert.equal(ctx.countRefs('prodotto_id', 'p1', { RigheOrdine: [{ prodotto_id: 'p1' }, { prodotto_id: 'p2' }, { prodotto_id: 'p1' }] }), 2)
+})
+test('password: lunghezza, lettere e numeri', () => {
+  assert.ok(ctx.validatePassword('abc12'))
+  assert.ok(ctx.validatePassword('abcdefgh'))
+  assert.ok(ctx.validatePassword('12345678'))
+  assert.equal(ctx.validatePassword('mentapep3rita'), '')
+})
+test('sessione valida solo prima della scadenza', () => {
+  const now = Date.parse('2026-11-05T12:00:00Z')
+  assert.ok(ctx.sessioneValida({ scade_il: '2026-12-01T00:00:00.000Z' }, now))
+  assert.ok(!ctx.sessioneValida({ scade_il: '2026-11-01T00:00:00.000Z' }, now))
+  assert.ok(!ctx.sessioneValida(undefined, now))
 })

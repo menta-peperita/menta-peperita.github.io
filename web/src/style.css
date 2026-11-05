@@ -182,3 +182,7 @@ textarea { padding: 12px 14px; resize: vertical; }
 .versione { display: block; text-align: center; font-size: 12px; padding: 8px 0 0; }
 .foto.tmp { position: relative; outline: 2px solid var(--accent); }
 .foto.tmp span { position: absolute; left: 6px; bottom: 6px; background: rgba(0,0,0,.6); color: #fff; font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 999px; }
+.login-card { gap: 12px; }
+.oppure { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; }
+.oppure::before, .oppure::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+.codice { letter-spacing: 8px; font-size: 22px !important; text-align: center; font-weight: 800; }

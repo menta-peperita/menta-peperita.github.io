@@ -8,7 +8,8 @@ var DATE_COLS = ['data', 'consegna_entro'];
 
 /** Schema: un foglio per tabella, riga 1 = intestazioni. setup() aggiunge solo cio' che manca. */
 var SCHEMA = {
-  Utenti: ['id', 'nome', 'email', 'ruolo', 'attivo', 'creato_il', 'creato_da'],
+  Utenti: ['id', 'nome', 'email', 'ruolo', 'attivo', 'creato_il', 'creato_da', 'password_hash'],
+  Sessioni: ['id', 'token_hash', 'utente_id', 'scade_il', 'dispositivo', 'creato_il'],
   Attivita: ['id', 'quando', 'utente_id', 'azione', 'entita', 'entita_id', 'dettaglio'],
   Contatori: ['nome', 'valore'],
   Impostazioni: ['chiave', 'valore'],
@@ -120,7 +121,18 @@ function countRefs(col, id, tables) {
   return n;
 }
 
-function publicUser(u) { return { id: u.id, nome: u.nome, email: normEmail(u.email), ruolo: u.ruolo === 'Socia' ? 'Titolare' : u.ruolo, attivo: isTrue(u.attivo) }; }
+function publicUser(u) { return { id: u.id, nome: u.nome, email: normEmail(u.email), ruolo: u.ruolo === 'Socia' ? 'Titolare' : u.ruolo, attivo: isTrue(u.attivo), haPassword: !!u.password_hash }; }
+
+var SESSIONE_GIORNI = 60;
+
+function validatePassword(p) {
+  p = String(p || '');
+  if (p.length < 8) return 'La password deve avere almeno 8 caratteri';
+  if (!/[A-Za-z]/.test(p) || !/\d/.test(p)) return 'Usa almeno una lettera e un numero';
+  return '';
+}
+
+function sessioneValida(s, nowMs) { return !!s && !!s.scade_il && new Date(s.scade_il).getTime() > nowMs; }
 
 /** Valida le righe di un ordine. */
 function validateRighe(righe) {
@@ -136,7 +148,13 @@ function validateRighe(righe) {
 
 // ================= HTTP =================
 
-var PUBLIC_ACTIONS = { catalogo: function () { return catalogo_(); } };
+var PUBLIC_ACTIONS = {
+  catalogo: function () { return catalogo_(); },
+  'auth.codice.invia': function (p) { return inviaCodice_(p); },
+  'auth.codice.verifica': function (p) { return verificaCodice_(p); },
+  'auth.password': function (p) { return loginPassword_(p); },
+  'auth.esci': function (p) { return esci_(p); }
+};
 
 var ACTIONS = {
   whoami: function (p, me) { return me; },
@@ -163,7 +181,8 @@ var ACTIONS = {
     var b = DriveApp.getFileById(f.drive_id).getBlob();
     return { mime: b.getContentType(), base64: Utilities.base64Encode(b.getBytes()) };
   },
-  'impostazioni.salva': function (p, me) { return salvaImpostazione_(p, me); }
+  'impostazioni.salva': function (p, me) { return salvaImpostazione_(p, me); },
+  'auth.imposta_password': function (p, me) { return impostaPassword_(p, me); }
 };
 
 function doGet() { return json_({ ok: true, service: 'menta-peperita', version: VERSION }); }
@@ -172,7 +191,7 @@ function doPost(e) {
   try {
     var req = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     if (PUBLIC_ACTIONS[req.action]) return json_({ ok: true, data: PUBLIC_ACTIONS[req.action](req.payload || {}) });
-    var me = authenticate_(req.idToken);
+    var me = req.sessione ? authSessione_(req.sessione) : authenticate_(req.idToken);
     var fn = ACTIONS[req.action];
     if (!fn) throw apiError_('UNKNOWN_ACTION', 'Azione sconosciuta: ' + req.action);
     return json_({ ok: true, data: fn(req.payload || {}, me) });
@@ -234,11 +253,12 @@ function deleteUtente_(p, me) {
     if (!u) throw apiError_('NOT_FOUND', 'Utente non trovato');
     var tables = {};
     Object.keys(SCHEMA).forEach(function (name) {
-      if (SCHEMA[name].some(function (c) { return USER_REF_COLS.indexOf(c) >= 0; })) tables[name] = readTable_(name).rows;
+      if (name !== 'Sessioni' && SCHEMA[name].some(function (c) { return USER_REF_COLS.indexOf(c) >= 0; })) tables[name] = readTable_(name).rows;
     });
     var n = countUserRefs(u.id, tables);
     if (n) throw apiError_('IN_USE', u.nome + ' ha gi\u00e0 ' + n + (n === 1 ? ' dato collegato' : ' dati collegati') + ': disattivalo invece di eliminarlo, cos\u00ec lo storico resta corretto');
     t.sheet.deleteRow(u._row);
+    deleteRows_('Sessioni', function (r) { return r.utente_id === u.id; });
     log_(me, 'elimina', 'utente', u.id, u.nome + ' (' + normEmail(u.email) + ')');
     return { id: u.id };
   });
@@ -490,6 +510,116 @@ function catalogo_() {
     prodotti: readTable_('Prodotti').rows.filter(function (r) { return isTrue(r.attivo) && isTrue(r.pubblico); })
       .map(function (r) { return { nome: r.nome, descrizione: r.descrizione, prezzo: r.prezzo, foto_id: r.foto_id }; })
   };
+}
+
+// ================= Accesso con codice via email o password =================
+
+function sha256Hex_(s) {
+  return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(s), Utilities.Charset.UTF_8)
+    .map(function (b) { return ('0' + (b & 0xff).toString(16)).slice(-2); }).join('');
+}
+function hashPassword_(password, salt, iter) {
+  var h = salt + ':' + password;
+  for (var i = 0; i < iter; i++) h = sha256Hex_(h + password);
+  return h;
+}
+function nuovoHash_(password) {
+  var salt = Utilities.getUuid().replace(/-/g, ''), iter = 1500;
+  return 'v1$' + iter + '$' + salt + '$' + hashPassword_(password, salt, iter);
+}
+function verificaHash_(password, stored) {
+  var p = String(stored || '').split('$');
+  return p.length === 4 && hashPassword_(password, p[2], Number(p[1])) === p[3];
+}
+function utentePerEmail_(email) {
+  return readTable_('Utenti').rows.filter(function (r) { return normEmail(r.email) === email && isTrue(r.attivo); })[0] || null;
+}
+
+function inviaCodice_(p) {
+  var email = normEmail(p.email), cache = CacheService.getScriptCache();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw apiError_('VALIDATION', 'Email non valida');
+  if (cache.get('cs_' + email)) throw apiError_('BUSY', 'Codice gi\u00e0 inviato: aspetta un minuto prima di chiederne un altro');
+  cache.put('cs_' + email, '1', 60);
+  var u = utentePerEmail_(email);
+  if (u) {
+    var codice = String(100000 + parseInt(Utilities.getUuid().replace(/-/g, '').slice(0, 12), 16) % 900000);
+    cache.put('cod_' + email, JSON.stringify({ h: sha256Hex_(codice), t: 0 }), 600);
+    MailApp.sendEmail({
+      to: email, name: 'Menta Peperita', subject: 'Il tuo codice Menta Peperita: ' + codice,
+      body: 'Ciao ' + u.nome + ',\n\nil codice per entrare nell\'app Menta Peperita \u00e8: ' + codice +
+        '\n\nVale 10 minuti e si pu\u00f2 usare una volta sola.\nSe non l\'hai chiesto tu, ignora questa email.'
+    });
+  }
+  return { inviato: true };
+}
+
+function verificaCodice_(p) {
+  var email = normEmail(p.email), cache = CacheService.getScriptCache(), raw = cache.get('cod_' + email);
+  if (!raw) throw apiError_('CODE_INVALID', 'Codice scaduto o mai richiesto: chiedine uno nuovo');
+  var c = JSON.parse(raw);
+  if (sha256Hex_(String(p.codice || '').replace(/\D/g, '')) !== c.h) {
+    c.t++;
+    if (c.t >= 5) { cache.remove('cod_' + email); throw apiError_('CODE_INVALID', 'Troppi tentativi: chiedi un nuovo codice'); }
+    cache.put('cod_' + email, JSON.stringify(c), 600);
+    throw apiError_('CODE_INVALID', 'Codice sbagliato, riprova');
+  }
+  cache.remove('cod_' + email);
+  var u = utentePerEmail_(email);
+  if (!u) throw apiError_('NOT_ALLOWED', email + ' non \u00e8 tra gli utenti abilitati');
+  return creaSessione_(u, p.dispositivo);
+}
+
+function loginPassword_(p) {
+  var email = normEmail(p.email), cache = CacheService.getScriptCache(), k = 'pw_' + email, n = Number(cache.get(k) || 0);
+  if (n >= 5) throw apiError_('LOCKED', 'Troppi tentativi: riprova tra 15 minuti oppure entra con il codice via email');
+  var u = utentePerEmail_(email);
+  if (!u || !u.password_hash || !verificaHash_(String(p.password || ''), u.password_hash)) {
+    cache.put(k, String(n + 1), 900);
+    throw apiError_('BAD_LOGIN', 'Email o password non corretti');
+  }
+  cache.remove(k);
+  return creaSessione_(u, p.dispositivo);
+}
+
+function creaSessione_(u, dispositivo) {
+  var token = Utilities.getUuid() + Utilities.getUuid();
+  var scade = new Date(Date.now() + SESSIONE_GIORNI * 864e5);
+  withLock_(function () {
+    appendRow_('Sessioni', { id: nextId_('ss', 'Sessioni'), token_hash: sha256Hex_(token), utente_id: u.id, scade_il: scade, dispositivo: String(dispositivo || '').slice(0, 120), creato_il: new Date() });
+  });
+  return { sessione: token, scade_il: scade.toISOString(), utente: publicUser(u) };
+}
+
+function authSessione_(token) {
+  var h = sha256Hex_(token), cache = CacheService.getScriptCache(), uid = cache.get('ses_' + h);
+  if (!uid) {
+    var s = readTable_('Sessioni').rows.filter(function (r) { return r.token_hash === h; })[0];
+    if (!sessioneValida(s, Date.now())) throw apiError_('SESSION_EXPIRED', 'Sessione scaduta, rientra');
+    uid = s.utente_id;
+    cache.put('ses_' + h, uid, 600);
+  }
+  var u = readTable_('Utenti').rows.filter(function (r) { return r.id === uid && isTrue(r.attivo); })[0];
+  if (!u) throw apiError_('NOT_ALLOWED', 'Utente non abilitato');
+  return publicUser(u);
+}
+
+function esci_(p) {
+  if (!p.sessione) return { ok: true };
+  var h = sha256Hex_(p.sessione);
+  CacheService.getScriptCache().remove('ses_' + h);
+  withLock_(function () { deleteRows_('Sessioni', function (r) { return r.token_hash === h; }); });
+  return { ok: true };
+}
+
+function impostaPassword_(p, me) {
+  var err = validatePassword(p.password);
+  if (err) throw apiError_('VALIDATION', err, { password: err });
+  return withLock_(function () {
+    var u = readTable_('Utenti').rows.filter(function (r) { return r.id === me.id; })[0];
+    updateRow_('Utenti', u._row, { password_hash: nuovoHash_(String(p.password)) });
+    log_(me, 'modifica', 'password', me.id, 'password impostata');
+    return { ok: true };
+  });
 }
 
 // ================= Login =================
