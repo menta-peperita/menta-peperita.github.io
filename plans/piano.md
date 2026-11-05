@@ -40,4 +40,16 @@ Vue 3 + Vite (PWA) su GitHub Pages → API Google Apps Script (bound al Google S
 | Fase | Stato |
 |---|---|
 | 0 | completata: login PC e telefono, API, Pages; Instagram via appunti |
-| 1 | consegnata: schema completo, utenti + attività, menu telefono/desktop, rinnovo login; 13 test verdi |
+| 1 | completata: schema, utenti Titolare/Aiuto, attività, menu, rinnovo login |
+| 2 | consegnata: listino, varianti, materiali per pezzo, costo e margine, foto prodotto |
+| 3 | consegnata: ordini con clienti, righe, varianti, consegna, assegnazione, duplica, numero MP-xxx sotto lock |
+| 4 | consegnata: cassa a movimenti (incassi, versamenti, rimborsi, prelievi), acconti, spese con rimborso |
+| 5 | consegnata: foto ordine su Drive, messaggi WhatsApp (link o condivisione) e Instagram (appunti + condivisione) |
+| 6 | consegnata: mercatini, checklist, cassa veloce, risultato per evento |
+| 7 | consegnata: scorte, fabbisogno ordini, lista Da comprare con suggerimenti, scorta aggiornata dalle spese |
+| 8 | consegnata: statistiche per periodo, divisione utili con prelievi, export CSV, catalogo pubblico /catalogo |
+| 9 | consegnata: importaVecchioFoglio(), backup mensile (ultime 12 copie) |
+
+## Da verificare sul campo
+- Condivisione foto+testo su iPhone (WhatsApp potrebbe tenere solo la foto).
+- Tempi della cassa veloce con rete del mercatino.

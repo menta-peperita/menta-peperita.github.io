@@ -76,3 +76,28 @@ test('utente con dati collegati non si elimina', () => {
   }
   assert.equal(ctx.countUserRefs('u2', tables), 5)
 })
+test('coerce: tipi, obbligatori, modifica parziale', () => {
+  const campi = { nome: 'testo!', prezzo: 'num', attivo: 'bool', data: 'data' }
+  let r = plain(ctx.coerce(campi, { nome: ' Tovaglietta ', prezzo: '8,5', attivo: 'TRUE', data: '2026-11-05' }, true))
+  assert.deepEqual(r, { obj: { nome: 'Tovaglietta', prezzo: 8.5, attivo: true, data: '2026-11-05' }, errors: {} })
+  r = plain(ctx.coerce(campi, { nome: '', prezzo: 'abc', data: '5/11' }, true))
+  assert.ok(r.errors.nome && r.errors.prezzo && r.errors.data)
+  r = plain(ctx.coerce(campi, { prezzo: '' }, false))
+  assert.deepEqual(r.obj, { prezzo: '' })
+})
+test('numero ordine', () => {
+  assert.equal(ctx.numeroOrdine(1), 'MP-001')
+  assert.equal(ctx.numeroOrdine(42), 'MP-042')
+  assert.equal(ctx.numeroOrdine(1234), 'MP-1234')
+  assert.equal(ctx.maxSuffix('MP-', [{ numero: 'MP-007' }, { numero: 'MP-012' }], 'numero'), 12)
+})
+test('righe ordine', () => {
+  assert.ok(ctx.validateRighe([]))
+  assert.ok(ctx.validateRighe([{ prodotto_id: '', descrizione: '', quantita: 1 }]))
+  assert.ok(ctx.validateRighe([{ prodotto_id: 'p1', quantita: 0 }]))
+  assert.ok(ctx.validateRighe([{ prodotto_id: 'p1', quantita: 1, prezzo_unitario: 'x' }]))
+  assert.equal(ctx.validateRighe([{ prodotto_id: 'p1', quantita: 2, prezzo_unitario: '' }, { descrizione: 'Altro', quantita: 1, prezzo_unitario: 5 }]), '')
+})
+test('riferimenti a un elemento', () => {
+  assert.equal(ctx.countRefs('prodotto_id', 'p1', { RigheOrdine: [{ prodotto_id: 'p1' }, { prodotto_id: 'p2' }, { prodotto_id: 'p1' }] }), 2)
+})

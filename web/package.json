@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node --test ../apps-script/test/logica.test.mjs"
+    "test": "node --test ../apps-script/test/logica.test.mjs src/logic/calcoli.test.js"
   },
   "dependencies": {
     "vue": "3.5.44",
