@@ -20,8 +20,12 @@ const r = computed(() => (o.value ? riepilogoOrdine(o.value, db) : null))
 const cliente = computed(() => db.Clienti.find((c) => c.id === o.value?.cliente_id) || null)
 const pagamenti = computed(() => db.Movimenti.filter((m) => m.ordine_id === id && m.tipo === 'INCASSO'))
 const foto = computed(() => db.Foto.filter((f) => f.ordine_id === id))
+const haFoto = computed(() => !!ultimaFoto.value || foto.value.length > 0)
 const occupato = ref(false)
 const ultimaFoto = ref(null)
+const anteprima = ref('')
+const salvaFoto = ref(localStorage.getItem('mp_salva_foto') === '1')
+watch(salvaFoto, (v) => { try { localStorage.setItem('mp_salva_foto', v ? '1' : '0') } catch {} })
 
 // ---- stato
 const statoOpz = Object.entries(STATI).map(([value, s]) => ({ value, label: s.label }))
@@ -53,8 +57,10 @@ async function onFoto(e) {
   try {
     const img = await ridimensiona(file)
     ultimaFoto.value = base64ToFile(img.base64, img.mime, (o.value.numero || 'foto') + '.jpg')
-    await azione('foto.carica', { ordine_id: id, ...img })
-    notify('Foto salvata')
+    if (anteprima.value) URL.revokeObjectURL(anteprima.value)
+    anteprima.value = URL.createObjectURL(ultimaFoto.value)
+    if (salvaFoto.value) { await azione('foto.carica', { ordine_id: id, ...img }); notify('Foto salvata nell\u2019ordine') }
+    else notify('Foto pronta per l\u2019invio (non salvata)')
   } catch (err) { notify(err.message, 'err') } finally { occupato.value = false }
 }
 async function fileFoto() {
@@ -66,7 +72,7 @@ async function fileFoto() {
 }
 async function eliminaFoto(f) {
   if (!confirm('Eliminare questa foto?')) return
-  try { await azione('foto.elimina', { id: f.id }); ultimaFoto.value = null } catch (e) { notify(e.message, 'err') }
+  try { await azione('foto.elimina', { id: f.id }) } catch (e) { notify(e.message, 'err') }
 }
 
 // ---- messaggi
@@ -89,7 +95,7 @@ watch([tipoMsg, () => o.value, () => r.value?.residuo], rigenera, { immediate: t
 
 async function whatsapp() {
   try {
-    const file = conFoto.value && foto.value.length ? await fileFoto() : null
+    const file = conFoto.value && haFoto.value ? await fileFoto() : null
     if (file && (await condividi({ testo: testo.value, file }))) return
     const tel = telefonoWa(cliente.value?.telefono)
     window.open('https://wa.me/' + tel + '?text=' + encodeURIComponent(testo.value), '_blank', 'noopener')
@@ -99,7 +105,7 @@ async function instagram() {
   try {
     const ok = await copia(testo.value)
     notify(ok ? 'Messaggio copiato: incollalo nella chat' : 'Copia il messaggio a mano', ok ? 'ok' : 'err')
-    const file = conFoto.value && foto.value.length ? await fileFoto() : null
+    const file = conFoto.value && haFoto.value ? await fileFoto() : null
     if (file && (await condividi({ file }))) return
     const h = String(cliente.value?.instagram || '').replace(/^@/, '')
     window.open(h ? 'https://ig.me/m/' + encodeURIComponent(h) : 'https://www.instagram.com/direct/inbox/', '_blank', 'noopener')
@@ -161,17 +167,19 @@ async function eliminaOrdine() {
       <div class="card">
         <h2 class="h2">Foto</h2>
         <TransitionGroup name="list" tag="div" class="foto-grid">
+          <div v-if="anteprima" key="tmp" class="foto tmp" :style="{ backgroundImage: 'url(' + anteprima + ')' }" role="img" aria-label="Foto appena scattata"><span>{{ salvaFoto ? 'Salvata' : 'Solo invio' }}</span></div>
           <button v-for="f in foto" :key="f.id" class="foto" :style="{ backgroundImage: 'url(' + fotoUrl(f.drive_id, 400) + ')' }" :aria-label="'Elimina foto'" @click="eliminaFoto(f)"></button>
           <label key="add" class="foto add"><Icona nome="foto" /> Scatta<input type="file" accept="image/*" capture="environment" @change="onFoto"></label>
         </TransitionGroup>
-        <small class="muted">Tocca una foto per eliminarla.</small>
+        <label class="check"><input v-model="salvaFoto" type="checkbox"> Salva anche nell&rsquo;ordine (occupa spazio su Drive)</label>
+        <small v-if="foto.length" class="muted">Tocca una foto salvata per eliminarla.</small>
       </div>
 
       <div class="card">
         <h2 class="h2">Messaggio al cliente</h2>
         <Seg v-model="tipoMsg" :opzioni="[{ value: 'ricevuto', label: 'Ricevuto' }, { value: 'pronto', label: '\u00c8 pronto' }, { value: 'pagamento', label: 'Promemoria' }]" wrap />
         <textarea v-model="testo" rows="4" aria-label="Testo del messaggio"></textarea>
-        <label v-if="foto.length" class="check"><input v-model="conFoto" type="checkbox"> Allega l&rsquo;ultima foto</label>
+        <label v-if="haFoto" class="check"><input v-model="conFoto" type="checkbox"> Allega la foto</label>
         <div class="grid2">
           <button class="btn" @click="whatsapp"><Icona nome="whatsapp" :size="18" /> WhatsApp</button>
           <button class="btn ghost" @click="instagram"><Icona nome="instagram" :size="18" /> Instagram</button>
