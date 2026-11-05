@@ -27,6 +27,8 @@ Vue 3 + Vite (PWA) su GitHub Pages → API Google Apps Script (bound al Google S
 | Riferimenti utente | per id, non per nome | rinominare non rompe lo storico |
 | Animazioni | `web/src/motion.css` + `<Transition>` Vue, solo transform/opacity | fluide, rispettano "riduci movimento" |
 | Messaggi Instagram | copia testo negli appunti + menu di condivisione con la foto; l'utente sceglie chat e incolla | Instagram ignora il testo condiviso e non accetta messaggi precompilati dal web |
+| Permessi | ruolo Socia gestisce utenti, Aiuto no; nessuno disattiva se stesso | evita di chiudersi fuori |
+| Id | progressivi per tabella nel foglio Contatori, sotto LockService | niente duplicati con salvataggi contemporanei |
 | Commit | autore "Menta Peperita" | nessuna email personale pubblica |
 | Versioni npm | fissate, pubblicate da ≥ 14 giorni | sicurezza supply chain |
 
@@ -38,3 +40,4 @@ Vue 3 + Vite (PWA) su GitHub Pages → API Google Apps Script (bound al Google S
 | Fase | Stato |
 |---|---|
 | 0 | completata: login PC e telefono, API, Pages; Instagram via appunti |
+| 1 | consegnata: schema completo, utenti + attività, menu telefono/desktop, rinnovo login; 13 test verdi |

@@ -1,11 +1,12 @@
 // Client unico verso l'API Apps Script. text/plain evita il preflight CORS.
-import { token, logout } from './auth'
+import { token, ensureFresh, expire, logout } from './auth'
 
 export class ApiError extends Error {
-  constructor(code, message) { super(message || code); this.code = code }
+  constructor(code, message, fields) { super(message || code); this.code = code; this.fields = fields || null }
 }
 
-export async function call(action, payload = {}) {
+export async function call(action, payload = {}, retry = true) {
+  await ensureFresh()
   let res
   try {
     res = await fetch(import.meta.env.VITE_API_URL, {
@@ -14,13 +15,16 @@ export async function call(action, payload = {}) {
       body: JSON.stringify({ action, payload, idToken: token.value })
     })
   } catch {
-    throw new ApiError('NETWORK', 'Connessione assente')
+    throw new ApiError('NETWORK', 'Connessione assente: riprova')
   }
   if (!res.ok) throw new ApiError('HTTP_' + res.status, 'Errore del server')
   const body = await res.json()
-  if (!body.ok) {
-    if (body.error === 'BAD_TOKEN' || body.error === 'NO_TOKEN') logout()
-    throw new ApiError(body.error, body.message)
+  if (body.ok) return body.data
+  const authErr = body.error === 'BAD_TOKEN' || body.error === 'NO_TOKEN'
+  if (authErr && retry) {
+    expire()
+    if (await ensureFresh()) return call(action, payload, false)
   }
-  return body.data
+  if (authErr || body.error === 'NOT_ALLOWED') logout()
+  throw new ApiError(body.error, body.message, body.fields)
 }

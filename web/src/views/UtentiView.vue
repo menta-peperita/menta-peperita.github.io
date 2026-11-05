@@ -1,0 +1,101 @@
+<script setup>
+import { ref, reactive, computed, onMounted } from 'vue'
+import { utenti, caricaUtenti, salvaUtente, iniziali } from '../utenti'
+import { me } from '../session'
+import { notify } from '../toast'
+import Icona from '../components/Icona.vue'
+
+const loading = ref(true)
+const errore = ref('')
+const aperto = ref(false)
+const salvando = ref(false)
+const form = reactive({ id: '', nome: '', email: '', ruolo: 'Socia', attivo: true })
+const errori = ref({})
+const puoGestire = computed(() => me.value.ruolo === 'Socia')
+const ordinati = computed(() => [...utenti.value].sort((a, b) => (b.attivo - a.attivo) || a.nome.localeCompare(b.nome, 'it')))
+const isMe = computed(() => form.id && form.id === me.value.id)
+
+onMounted(async () => {
+  try { await caricaUtenti(true) } catch (e) { errore.value = e.message } finally { loading.value = false }
+})
+
+function apri(u) {
+  Object.assign(form, u ? { ...u } : { id: '', nome: '', email: '', ruolo: 'Socia', attivo: true })
+  errori.value = {}
+  aperto.value = true
+}
+
+async function salva() {
+  salvando.value = true
+  errori.value = {}
+  try {
+    const nuovo = !form.id
+    const u = await salvaUtente({ ...form })
+    if (u.id === me.value.id) me.value = { ...me.value, nome: u.nome, email: u.email }
+    aperto.value = false
+    notify(nuovo ? u.nome + ' aggiunto' : 'Modifiche salvate')
+  } catch (e) {
+    if (e.fields) errori.value = e.fields
+    notify(e.message, 'err')
+  } finally { salvando.value = false }
+}
+</script>
+
+<template>
+  <section>
+    <div class="head-row">
+      <h1 class="title">Utenti</h1>
+      <button v-if="puoGestire" class="btn" @click="apri()"><Icona nome="piu" :size="18" /> Nuovo</button>
+    </div>
+    <p class="muted hint">Chi entra nell&rsquo;app con l&rsquo;account Google indicato qui. Finch&eacute; l&rsquo;app &egrave; in prova, aggiungi la stessa email anche tra gli utenti di test di Google.</p>
+
+    <div v-if="loading" class="col">
+      <div v-for="i in 3" :key="i" class="skeleton" style="height: 64px"></div>
+    </div>
+    <p v-else-if="errore" class="error shake">{{ errore }}</p>
+    <TransitionGroup v-else name="list" tag="ul" class="list">
+      <li v-for="u in ordinati" :key="u.id" class="row card" :class="{ off: !u.attivo }">
+        <span class="avatar">{{ iniziali(u.nome) }}</span>
+        <span class="row-main">
+          <strong>{{ u.nome }} <span v-if="u.id === me.id" class="badge">tu</span></strong>
+          <small>{{ u.email }}</small>
+        </span>
+        <span class="badge" :class="u.attivo ? 'ok' : 'off'">{{ u.attivo ? u.ruolo : 'Disattivato' }}</span>
+        <button v-if="puoGestire" class="icon-btn" :aria-label="'Modifica ' + u.nome" @click="apri(u)"><Icona nome="matita" :size="18" /></button>
+      </li>
+    </TransitionGroup>
+
+    <Transition name="fade"><div v-if="aperto" class="backdrop" @click="aperto = false"></div></Transition>
+    <Transition name="sheet">
+      <form v-if="aperto" class="sheet form" @submit.prevent="salva" :aria-label="form.id ? 'Modifica utente' : 'Nuovo utente'">
+        <div class="head-row">
+          <h2>{{ form.id ? 'Modifica utente' : 'Nuovo utente' }}</h2>
+          <button type="button" class="icon-btn" aria-label="Chiudi" @click="aperto = false"><Icona nome="chiudi" /></button>
+        </div>
+        <label class="field">
+          <span>Nome</span>
+          <input v-model="form.nome" type="text" autocomplete="off" :class="{ invalid: errori.nome }" required>
+          <small v-if="errori.nome" class="error">{{ errori.nome }}</small>
+        </label>
+        <label class="field">
+          <span>Email Google</span>
+          <input v-model="form.email" type="email" autocapitalize="none" autocomplete="off" placeholder="nome@gmail.com" :class="{ invalid: errori.email }" required>
+          <small v-if="errori.email" class="error">{{ errori.email }}</small>
+        </label>
+        <fieldset class="field">
+          <legend>Ruolo</legend>
+          <div class="seg">
+            <button v-for="r in ['Socia', 'Aiuto']" :key="r" type="button" :aria-pressed="form.ruolo === r" :disabled="isMe" @click="form.ruolo = r">{{ r }}</button>
+          </div>
+          <small class="muted">Le socie possono gestire gli utenti; l&rsquo;aiuto no.</small>
+          <small v-if="errori.ruolo" class="error">{{ errori.ruolo }}</small>
+        </fieldset>
+        <label v-if="form.id" class="check">
+          <input v-model="form.attivo" type="checkbox" :disabled="isMe"> Attivo (pu&ograve; entrare nell&rsquo;app)
+        </label>
+        <small v-if="errori.attivo" class="error">{{ errori.attivo }}</small>
+        <button class="btn full" :disabled="salvando">{{ salvando ? 'Salvataggio\u2026' : 'Salva' }}</button>
+      </form>
+    </Transition>
+  </section>
+</template>
