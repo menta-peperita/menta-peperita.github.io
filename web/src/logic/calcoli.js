@@ -141,6 +141,25 @@ export function testoMessaggio(tipo, v, modelli = {}) {
   return (modelli[tipo] || MODELLI[tipo]).replace(/\{(\w+)\}/g, (_, k) => (v[k] == null ? '' : String(v[k])))
 }
 
+/** Minuti per pezzo misurati sugli ordini con un solo prodotto e il tempo indicato. */
+export function tempoMisurato(pid, db) {
+  let minuti = 0
+  let pezzi = 0
+  let ordini = 0
+  for (const o of db.Ordini) {
+    const t = num(o.tempo_min)
+    if (!t || o.stato === 'annullato') continue
+    const righe = db.RigheOrdine.filter((r) => r.ordine_id === o.id)
+    if (!righe.length || righe.some((r) => r.prodotto_id !== pid)) continue
+    const q = righe.reduce((s, r) => s + Number(r.quantita || 0), 0)
+    if (!q) continue
+    minuti += t
+    pezzi += q
+    ordini++
+  }
+  return ordini ? { perPezzo: r2(minuti / pezzi), ordini } : { perPezzo: null, ordini: 0 }
+}
+
 /** Costi per prodotto: materiali, tempo, margine, guadagno all'ora e vendite del periodo. */
 export function costiProdotti(db, da, a, costoOrario) {
   const orario = num(costoOrario)
@@ -148,7 +167,9 @@ export function costiProdotti(db, da, a, costoOrario) {
   const ordiniP = new Set(db.Ordini.filter((o) => o.stato !== 'annullato' && inP(o.data)).map((o) => o.id))
   return db.Prodotti.map((p) => {
     const { prezzo, costo, completo, margine } = margineProdotto(p, db)
-    const minuti = num(p.tempo_min)
+    const misura = tempoMisurato(p.id, db)
+    const stimato = num(p.tempo_min)
+    const minuti = misura.perPezzo ?? stimato
     const costoTempo = orario != null && minuti != null ? r2((orario * minuti) / 60) : null
     const costoPieno = costoTempo != null ? r2(costo + costoTempo) : null
     let venduti = 0
@@ -165,7 +186,7 @@ export function costiProdotti(db, da, a, costoOrario) {
       id: p.id, nome: p.nome, attivo: p.attivo === true || p.attivo === 'TRUE',
       prezzo, costo, completo, margine,
       marginePerc: prezzo ? Math.round((margine / prezzo) * 100) : null,
-      minuti, guadagnoOra: margine != null && minuti ? r2(margine / (minuti / 60)) : null,
+      minuti, fonteTempo: misura.perPezzo != null ? 'misurato' : stimato != null ? 'stimato' : '', misure: misura.ordini, guadagnoOra: margine != null && minuti ? r2(margine / (minuti / 60)) : null,
       costoPieno, sottoCosto: prezzo != null && costoPieno != null && prezzo < costoPieno,
       venduti, margineTotale: r2(margineTotale)
     }

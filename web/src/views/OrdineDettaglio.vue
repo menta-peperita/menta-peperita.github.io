@@ -29,8 +29,20 @@ watch(salvaFoto, (v) => { try { localStorage.setItem('mp_salva_foto', v ? '1' : 
 
 // ---- stato
 const statoOpz = Object.entries(STATI).map(([value, s]) => ({ value, label: s.label }))
+const tempo = reactive({ aperto: false, ore: '', minuti: '', dopo: '' })
+const fmtTempo = (m) => (m >= 60 ? Math.floor(m / 60) + ' h' + (m % 60 ? ' ' + (m % 60) + ' min' : '') : m + ' min')
+function apriTempo(dopo = '') {
+  const m = Number(o.value.tempo_min) || 0
+  Object.assign(tempo, { aperto: true, ore: m ? Math.floor(m / 60) || '' : '', minuti: m ? m % 60 || '' : '', dopo })
+}
+async function salvaTempo(minuti) {
+  const tot = minuti != null ? minuti : (Number(tempo.ore) || 0) * 60 + (Number(tempo.minuti) || 0)
+  tempo.aperto = false
+  try { await azione('ordine.tempo', { id, tempo_min: tot || '' }); if (tot) notify('Tempo registrato: ' + fmtTempo(tot)) } catch (e) { notify(e.message, 'err') }
+}
 async function cambiaStato(stato) {
   if (stato === o.value.stato) return
+  if (stato === 'pronto' && !Number(o.value.tempo_min)) apriTempo()
   occupato.value = true
   try { await azione('ordine.stato', { id, stato }); notify('Stato: ' + STATI[stato].label) } catch (e) { notify(e.message, 'err') } finally { occupato.value = false }
 }
@@ -141,6 +153,7 @@ async function eliminaOrdine() {
           <template v-if="o.assegnato_a"> &middot; lo fa {{ nomeUtente(o.assegnato_a) }}</template>
         </small>
         <p v-if="o.note" class="note">{{ o.note }}</p>
+        <button class="link-btn" @click="apriTempo()">{{ Number(o.tempo_min) ? 'Tempo di lavoro: ' + fmtTempo(Number(o.tempo_min)) + ' \u00b7 modifica' : 'Aggiungi il tempo di lavoro' }}</button>
       </div>
 
       <div class="card">
@@ -193,6 +206,18 @@ async function eliminaOrdine() {
       </div>
     </div>
 
+    <Sheet :open="tempo.aperto" titolo="Quanto tempo ci avete messo?" @close="tempo.aperto = false">
+      <p class="muted">Tempo totale per tutto l&rsquo;ordine, anche approssimativo. Serve a calcolare quanto rende ogni prodotto.</p>
+      <div class="grid3q">
+        <button v-for="m in [30, 60, 120, 180, 240, 360]" :key="m" type="button" class="btn ghost" @click="salvaTempo(m)">{{ fmtTempo(m) }}</button>
+      </div>
+      <div class="grid2">
+        <label class="field"><span>Ore</span><input v-model="tempo.ore" type="text" inputmode="numeric"></label>
+        <label class="field"><span>Minuti</span><input v-model="tempo.minuti" type="text" inputmode="numeric"></label>
+      </div>
+      <button class="btn full" :disabled="!tempo.ore && !tempo.minuti" @click="salvaTempo()">Salva</button>
+      <button class="btn ghost full" @click="tempo.aperto = false">Salta</button>
+    </Sheet>
     <Sheet :open="pag.aperto" titolo="Registra pagamento" @close="pag.aperto = false">
       <label class="field"><span>Importo &euro;</span><input v-model="pag.importo" type="text" inputmode="decimal" required></label>
       <fieldset class="field"><legend>Metodo</legend><Seg v-model="pag.metodo" :opzioni="METODI" wrap /></fieldset>

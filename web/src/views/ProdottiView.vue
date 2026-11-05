@@ -3,7 +3,7 @@ import { ref, reactive, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { db, pronto, salva, elimina, azione, fotoUrl } from '../store'
 import { me } from '../session'
-import { margineProdotto, fabbisogno, euro, num } from '../logic/calcoli'
+import { margineProdotto, fabbisogno, tempoMisurato, euro, num } from '../logic/calcoli'
 import { ridimensiona } from '../media'
 import { notify } from '../toast'
 import Seg from '../components/Seg.vue'
@@ -171,8 +171,9 @@ async function spunta(d) { try { await salva('dacomprare', { id: d.id, fatto: !f
       <label class="field"><span>Nome</span><input v-model="pf.nome" type="text" required></label>
       <div class="grid2">
         <label class="field"><span>Prezzo &euro;</span><input v-model="pf.prezzo" type="text" inputmode="decimal" placeholder="da definire"></label>
-        <label class="field"><span>Minuti per farlo</span><input v-model="pf.tempo_min" type="text" inputmode="numeric"></label>
+        <label class="field"><span>Minuti per farlo (stima)</span><input v-model="pf.tempo_min" type="text" inputmode="numeric"></label>
       </div>
+      <small v-if="pf.id && tempoMisurato(pf.id, db).ordini" class="muted">Misurato sugli ordini: {{ tempoMisurato(pf.id, db).perPezzo }} min a pezzo ({{ tempoMisurato(pf.id, db).ordini }} ordini). Nei calcoli vale questo.</small>
       <label class="field"><span>Descrizione (per il catalogo)</span><textarea v-model="pf.descrizione" rows="2"></textarea></label>
       <label class="check"><input v-model="pf.pubblico" type="checkbox"> Mostra nel catalogo pubblico</label>
       <label class="check"><input v-model="pf.attivo" type="checkbox"> Attivo (si pu&ograve; ordinare)</label>

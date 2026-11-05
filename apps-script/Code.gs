@@ -18,7 +18,7 @@ var SCHEMA = {
   Materiali: ['id', 'nome', 'unita', 'costo_unitario', 'scorta', 'soglia_minima', 'attivo'],
   ProdottiMateriali: ['id', 'prodotto_id', 'materiale_id', 'quantita'],
   Clienti: ['id', 'nome', 'instagram', 'telefono', 'note', 'creato_il', 'creato_da'],
-  Ordini: ['id', 'numero', 'data', 'cliente_id', 'canale', 'stato', 'consegna_entro', 'assegnato_a', 'note', 'evento_id', 'consegnato_il', 'creato_il', 'creato_da'],
+  Ordini: ['id', 'numero', 'data', 'cliente_id', 'canale', 'stato', 'consegna_entro', 'assegnato_a', 'note', 'evento_id', 'consegnato_il', 'tempo_min', 'creato_il', 'creato_da'],
   RigheOrdine: ['id', 'ordine_id', 'prodotto_id', 'variante_id', 'descrizione', 'quantita', 'prezzo_unitario', 'costo_unitario'],
   Movimenti: ['id', 'data', 'tipo', 'importo', 'metodo', 'utente_id', 'ordine_id', 'spesa_id', 'evento_id', 'note', 'creato_il', 'creato_da'],
   Spese: ['id', 'data', 'descrizione', 'negozio', 'quantita', 'costo', 'pagato_da', 'stato_rimborso', 'evento_id', 'materiale_id', 'note', 'creato_il', 'creato_da'],
@@ -171,6 +171,7 @@ var ACTIONS = {
   'ordine.salva': function (p, me) { return salvaOrdine_(p, me); },
   'ordine.stato': function (p, me) { return statoOrdine_(p, me); },
   'ordine.elimina': function (p, me) { return eliminaOrdine_(p, me); },
+  'ordine.tempo': function (p, me) { return tempoOrdine_(p, me); },
   'banco.vendita': function (p, me) { return venditaBanco_(p, me); },
   'spesa.rimborsa': function (p, me) { return rimborsaSpesa_(p, me); },
   'foto.carica': function (p, me) { return caricaFoto_(p, me); },
@@ -401,6 +402,18 @@ function statoOrdine_(p, me) {
     updateRow_('Ordini', old._row, { stato: p.stato, consegnato_il: p.stato === 'consegnato' ? oggi_() : '' });
     log_(me, 'modifica', 'ordine', old.id, old.numero + ' \u00b7 stato: ' + old.stato + ' \u2192 ' + p.stato);
     return { id: old.id, stato: p.stato };
+  });
+}
+
+function tempoOrdine_(p, me) {
+  var t = p.tempo_min === '' || p.tempo_min == null ? '' : Math.round(Number(p.tempo_min));
+  if (t !== '' && (isNaN(t) || t < 0 || t > 100000)) throw apiError_('VALIDATION', 'Tempo non valido');
+  return withLock_(function () {
+    var old = readTable_('Ordini').rows.filter(function (r) { return r.id === p.id; })[0];
+    if (!old) throw apiError_('NOT_FOUND', 'Ordine non trovato');
+    updateRow_('Ordini', old._row, { tempo_min: t });
+    log_(me, 'modifica', 'ordine', old.id, old.numero + ' \u00b7 tempo: ' + (t === '' ? 'tolto' : t + ' min'));
+    return { id: old.id, tempo_min: t };
   });
 }
 

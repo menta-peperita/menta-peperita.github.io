@@ -91,3 +91,15 @@ test('costi per prodotto con tempo e costo orario', () => {
   db.Prodotti[0].prezzo = 5
   assert.equal(c.costiProdotti(db, '', '', 10).find((x) => x.id === 'p1').sottoCosto, true)
 })
+test('tempo misurato: solo ordini con un unico prodotto', () => {
+  const db = base()
+  db.Ordini[0].tempo_min = 60 // o1: 5 tovaglie -> 12 min
+  db.Ordini[2].tempo_min = 340 // o3: 34 tovaglie -> 10 min
+  db.Ordini[1].tempo_min = 999 // o2: quadretto, non conta per p1
+  db.RigheOrdine.push({ ordine_id: 'o5', prodotto_id: 'p1', quantita: 1 }, { ordine_id: 'o5', prodotto_id: 'p2', quantita: 1 })
+  db.Ordini.push({ id: 'o5', stato: 'pronto', tempo_min: 500 }) // misto: escluso
+  assert.deepEqual(c.tempoMisurato('p1', db), { perPezzo: 10.26, ordini: 2 })
+  const t = c.costiProdotti(db, '', '', null).find((x) => x.id === 'p1')
+  assert.equal(t.fonteTempo, 'misurato')
+  assert.equal(t.minuti, 10.26)
+})

@@ -98,7 +98,7 @@ function esporta() {
                 <td>{{ euro(p.costo) }}</td>
                 <td>{{ p.prezzo == null ? '\u2014' : euro(p.prezzo) }}</td>
                 <td :class="p.margine != null && p.margine < 0 ? 'neg' : ''">{{ p.margine == null ? '\u2014' : euro(p.margine) }}<small v-if="p.marginePerc != null" class="muted"> {{ p.marginePerc }}%</small></td>
-                <td>{{ p.minuti ?? '\u2014' }}</td>
+                <td>{{ p.minuti ?? '\u2014' }}<small v-if="p.fonteTempo" class="muted"> {{ p.fonteTempo === 'misurato' ? 'misurato su ' + p.misure + (p.misure === 1 ? ' ordine' : ' ordini') : 'stimato' }}</small></td>
                 <td class="pos">{{ p.guadagnoOra == null ? '\u2014' : euro(p.guadagnoOra) }}</td>
                 <td v-if="orario" :class="p.sottoCosto ? 'neg' : ''">{{ p.costoPieno == null ? '\u2014' : euro(p.costoPieno) }}<small v-if="p.sottoCosto"> sotto costo</small></td>
                 <td>{{ p.venduti }}</td>
@@ -107,7 +107,7 @@ function esporta() {
             </tbody>
           </table>
         </div>
-        <small class="muted">Margine = prezzo &minus; materiali. &euro;/ora = margine diviso il tempo per farlo. Costo pieno = materiali + tempo al costo orario.</small>
+        <small class="muted">Margine = prezzo &minus; materiali. &euro;/ora = margine diviso il tempo per farlo; il tempo &egrave; misurato sugli ordini con un solo prodotto (quando segnate &ldquo;Pronto&rdquo;), altrimenti usa la stima della scheda prodotto. Costo pieno = materiali + tempo al costo orario.</small>
       </div>
       <div class="card">
         <h2 class="h2">Divisione utili</h2>

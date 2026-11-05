@@ -191,3 +191,5 @@ textarea { padding: 12px 14px; resize: vertical; }
 .tab th { text-align: left; font-size: 12px; color: var(--muted); font-weight: 800; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
 .tab td { padding: 10px 8px; border-bottom: 1px solid #F0F0F0; white-space: nowrap; }
 .tab tr.alert td { background: #FDF0EF; }
+.grid3q { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.link-btn { all: unset; color: var(--accent); font-weight: 800; font-size: 14px; cursor: pointer; min-height: 32px; }
