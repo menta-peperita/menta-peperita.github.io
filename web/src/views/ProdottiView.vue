@@ -10,6 +10,7 @@ import Seg from '../components/Seg.vue'
 import Sheet from '../components/Sheet.vue'
 import Vuoto from '../components/Vuoto.vue'
 import Icona from '../components/Icona.vue'
+import FotoImg from '../components/FotoImg.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -28,6 +29,15 @@ const varianti = computed(() => db.Varianti.filter((v) => v.prodotto_id === pf.i
 const materialiP = computed(() => db.ProdottiMateriali.filter((x) => x.prodotto_id === pf.id))
 const margine = computed(() => (pf.id ? margineProdotto({ id: pf.id, prezzo: pf.prezzo }, db) : null))
 const fotoAttuale = computed(() => db.Prodotti.find((p) => p.id === pf.id)?.foto_id)
+const galleria = computed(() => {
+  const l = db.Foto.filter((f) => f.prodotto_id === pf.id)
+  return [...l].sort((a, b) => (b.drive_id === fotoAttuale.value) - (a.drive_id === fotoAttuale.value))
+})
+async function principale(f) { try { await salva('prodotto', { id: pf.id, foto_id: f.drive_id }); notify('Foto principale aggiornata') } catch (e) { err(e) } }
+async function togliFoto(f) {
+  if (!confirm('Eliminare questa foto?')) return
+  try { await azione('foto.elimina', { id: f.id }) } catch (e) { err(e) }
+}
 const nv = reactive({ gruppo: 'Colore', nome: '', sovrapprezzo: '' })
 const nm = reactive({ materiale_id: '', quantita: 1 })
 
@@ -60,7 +70,7 @@ async function fotoProdotto(e) {
   e.target.value = ''
   if (!file) return
   occupato.value = true
-  try { await azione('foto.carica', { prodotto_id: pf.id, ...(await ridimensiona(file, 1000)) }); notify('Foto aggiornata') } catch (x) { err(x) } finally { occupato.value = false }
+  try { await azione('foto.carica', { prodotto_id: pf.id, ...(await ridimensiona(file, 1200)) }); notify('Foto aggiunta') } catch (x) { err(x) } finally { occupato.value = false }
 }
 
 // ---------- Materiali
@@ -180,16 +190,26 @@ async function spunta(d) { try { await salva('dacomprare', { id: d.id, fatto: !f
       <button class="btn full" :disabled="occupato || !pf.nome.trim()" @click="salvaProdotto">Salva</button>
       <template v-if="pf.id">
         <div class="box">
-          <div class="head-row"><strong>Foto</strong>
-            <label class="btn ghost file"><Icona nome="foto" :size="18" /> {{ fotoAttuale ? 'Cambia' : 'Aggiungi' }}<input type="file" accept="image/*" @change="fotoProdotto"></label>
+          <div class="head-row"><strong>Foto &middot; {{ galleria.length }}</strong>
+            <label class="btn ghost file"><Icona nome="foto" :size="18" /> Aggiungi<input type="file" accept="image/*" @change="fotoProdotto"></label>
           </div>
-          <img v-if="fotoAttuale" :src="fotoUrl(fotoAttuale, 400)" alt="" class="foto-prod">
+          <TransitionGroup v-if="galleria.length" name="list" tag="div" class="galleria">
+            <div v-for="f in galleria" :key="f.id" class="gal-item" :class="{ main: f.drive_id === fotoAttuale }">
+              <FotoImg :drive-id="f.drive_id" :w="400" />
+              <span v-if="f.drive_id === fotoAttuale" class="gal-tag">Principale</span>
+              <div class="gal-azioni">
+                <button v-if="f.drive_id !== fotoAttuale" type="button" class="mini" @click="principale(f)">Principale</button>
+                <button type="button" class="mini danger" aria-label="Elimina foto" @click="togliFoto(f)"><Icona nome="cestino" :size="16" /></button>
+              </div>
+            </div>
+          </TransitionGroup>
+          <small class="muted">La principale &egrave; la prima del catalogo; nel catalogo le altre si scorrono con il dito.</small>
         </div>
         <div class="box">
           <strong>Varianti</strong>
           <div v-for="v in varianti" :key="v.id" class="head-row"><span>{{ v.gruppo ? v.gruppo + ': ' : '' }}{{ v.nome }}<small v-if="v.sovrapprezzo" class="muted"> +{{ euro(v.sovrapprezzo) }}</small></span>
             <button class="icon-btn" aria-label="Togli variante" @click="togliFiglio('variante', v.id)"><Icona nome="cestino" :size="18" /></button></div>
-          <div class="grid3">
+          <div class="grid-var">
             <input v-model="nv.gruppo" type="text" placeholder="Gruppo" aria-label="Gruppo">
             <input v-model="nv.nome" type="text" placeholder="Es. Verde" aria-label="Nome variante">
             <input v-model="nv.sovrapprezzo" type="text" inputmode="decimal" placeholder="+ &euro;" aria-label="Sovrapprezzo">

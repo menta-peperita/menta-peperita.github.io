@@ -480,7 +480,7 @@ function caricaFoto_(p, me) {
     appendRow_('Foto', row);
     if (p.prodotto_id) {
       var pr = readTable_('Prodotti').rows.filter(function (r) { return r.id === p.prodotto_id; })[0];
-      if (pr) updateRow_('Prodotti', pr._row, { foto_id: file.getId() });
+      if (pr && (!pr.foto_id || p.principale)) updateRow_('Prodotti', pr._row, { foto_id: file.getId() });
     }
     log_(me, 'crea', 'foto', row.id, p.ordine_id || p.prodotto_id || '');
     return clean_(row);
@@ -493,6 +493,13 @@ function eliminaFoto_(p, me) {
     if (!f) throw apiError_('NOT_FOUND', 'Foto non trovata');
     try { DriveApp.getFileById(f.drive_id).setTrashed(true); } catch (e) {}
     deleteRows_('Foto', function (r) { return r.id === p.id; });
+    if (f.prodotto_id) {
+      var pr = readTable_('Prodotti').rows.filter(function (r) { return r.id === f.prodotto_id; })[0];
+      if (pr && pr.foto_id === f.drive_id) {
+        var altra = readTable_('Foto').rows.filter(function (r) { return r.prodotto_id === f.prodotto_id; })[0];
+        updateRow_('Prodotti', pr._row, { foto_id: altra ? altra.drive_id : '' });
+      }
+    }
     log_(me, 'elimina', 'foto', p.id, f.ordine_id || f.prodotto_id || '');
     return { id: p.id };
   });
@@ -516,12 +523,24 @@ function salvaImpostazione_(p, me) {
   });
 }
 
+var fotoProdottiCache_ = null;
+function readFotoProdotti_() {
+  if (fotoProdottiCache_) return fotoProdottiCache_;
+  fotoProdottiCache_ = {};
+  readTable_('Foto').rows.forEach(function (f) { if (f.prodotto_id) (fotoProdottiCache_[f.prodotto_id] = fotoProdottiCache_[f.prodotto_id] || []).push(f.drive_id); });
+  return fotoProdottiCache_;
+}
+
 function catalogo_() {
   var imp = impostazioni_();
   return {
     instagram: imp.instagram || '', whatsapp: imp.whatsapp || '',
     prodotti: readTable_('Prodotti').rows.filter(function (r) { return isTrue(r.attivo) && isTrue(r.pubblico); })
-      .map(function (r) { return { nome: r.nome, descrizione: r.descrizione, prezzo: r.prezzo, foto_id: r.foto_id }; })
+      .map(function (r) {
+        var foto = readFotoProdotti_()[r.id] || [];
+        if (r.foto_id) foto = [r.foto_id].concat(foto.filter(function (x) { return x !== r.foto_id; }));
+        return { nome: r.nome, descrizione: r.descrizione, prezzo: r.prezzo, foto_id: r.foto_id, foto: foto };
+      })
   };
 }
 
