@@ -90,7 +90,7 @@ function esporta() {
         <h2 class="h2">Costi per prodotto</h2>
         <p class="muted">Ordinati per guadagno all&rsquo;ora. Venduti e margine totale si riferiscono al periodo scelto.<template v-if="orario"> Costo del lavoro: {{ euro(orario) }}/ora.</template><template v-else> Imposta il costo orario del lavoro in Impostazioni per vedere il costo pieno.</template></p>
         <div class="table-wrap">
-          <table class="tab">
+          <table class="tabella">
             <thead><tr><th>Prodotto</th><th>Materiali</th><th>Prezzo</th><th>Margine</th><th>Minuti</th><th>&euro;/ora</th><th v-if="orario">Costo pieno</th><th>Venduti</th><th>Margine tot.</th></tr></thead>
             <tbody>
               <tr v-for="p in costi" :key="p.id" :class="{ alert: p.sottoCosto }">

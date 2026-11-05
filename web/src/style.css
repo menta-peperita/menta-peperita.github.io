@@ -25,7 +25,7 @@ button { font: inherit; }
 .card.center { align-items: center; text-align: center; }
 .card.empty { padding: 32px 16px; }
 
-.btn { min-height: 46px; padding: 0 18px; border-radius: 12px; border: 1px solid var(--accent); background: var(--accent); color: #fff; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.btn { text-decoration: none; min-height: 46px; padding: 0 18px; border-radius: 12px; border: 1px solid var(--accent); background: var(--accent); color: #fff; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
 .btn.ghost { background: #fff; color: var(--accent); }
 .btn.full { width: 100%; }
 .btn:disabled { opacity: .5; cursor: default; }
@@ -54,7 +54,7 @@ button { font: inherit; }
 .field input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
 .field input.invalid { border-color: var(--danger); }
 .seg { display: flex; gap: 8px; }
-.seg button { flex: 1; min-height: 44px; border-radius: 999px; border: 1px solid #D6D6D6; background: #fff; font-weight: 800; cursor: pointer; }
+.seg button { flex: 1; min-height: 44px; border-radius: 999px; border: 1px solid #D6D6D6; background: #fff; color: var(--ink); font-weight: 800; cursor: pointer; }
 .seg button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
 .seg button:disabled { opacity: .5; cursor: default; }
 .check { display: flex; align-items: center; gap: 10px; min-height: 44px; font-weight: 700; }
@@ -187,9 +187,9 @@ textarea { padding: 12px 14px; resize: vertical; }
 .oppure::before, .oppure::after { content: ''; flex: 1; height: 1px; background: var(--line); }
 .codice { letter-spacing: 8px; font-size: 22px !important; text-align: center; font-weight: 800; }
 .table-wrap { overflow-x: auto; margin: 0 -4px; }
-.tab { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 640px; }
-.tab th { text-align: left; font-size: 12px; color: var(--muted); font-weight: 800; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
-.tab td { padding: 10px 8px; border-bottom: 1px solid #F0F0F0; white-space: nowrap; }
-.tab tr.alert td { background: #FDF0EF; }
+.tabella { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 640px; }
+.tabella th { text-align: left; font-size: 12px; color: var(--muted); font-weight: 800; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.tabella td { padding: 10px 8px; border-bottom: 1px solid #F0F0F0; white-space: nowrap; }
+.tabella tr.alert td { background: #FDF0EF; }
 .grid3q { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .link-btn { all: unset; color: var(--accent); font-weight: 800; font-size: 14px; cursor: pointer; min-height: 32px; }
