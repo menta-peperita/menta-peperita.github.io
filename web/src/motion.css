@@ -1,0 +1,66 @@
+/* Animazioni condivise. Solo transform/opacity: fluide anche su telefoni economici. */
+:root {
+  --dur-fast: 140ms;
+  --dur: 260ms;
+  --dur-slow: 420ms;
+  --ease: cubic-bezier(.2, .8, .2, 1);
+  --ease-spring: cubic-bezier(.34, 1.56, .64, 1);
+}
+
+/* Pressione su pulsanti e card toccabili */
+.btn, .tap { transition: transform var(--dur-fast) var(--ease), box-shadow var(--dur) var(--ease), background-color var(--dur) var(--ease); }
+.btn:active, .tap:active { transform: scale(.96); }
+
+/* Desktop: le card si sollevano al passaggio del mouse */
+@media (hover: hover) and (pointer: fine) {
+  .tap:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(31, 31, 31, .08); }
+}
+
+/* Entrata a cascata: aggiungi .stagger al contenitore */
+.stagger > * { animation: fade-up var(--dur-slow) var(--ease) both; }
+.stagger > *:nth-child(2) { animation-delay: 60ms; }
+.stagger > *:nth-child(3) { animation-delay: 120ms; }
+.stagger > *:nth-child(4) { animation-delay: 180ms; }
+.stagger > *:nth-child(n+5) { animation-delay: 240ms; }
+
+/* Logo: respiro leggero e foglia che oscilla */
+.breathe { animation: breathe 4s ease-in-out infinite; }
+.sway { display: inline-block; animation: sway 3.5s ease-in-out infinite; transform-origin: 50% 100%; }
+
+/* Errore: piccola scossa */
+.shake { animation: shake 420ms var(--ease); }
+
+/* Caricamento a scheletro */
+.skeleton { border-radius: 10px; background: linear-gradient(90deg, #EFEFEA 25%, #F7F7F3 50%, #EFEFEA 75%); background-size: 200% 100%; animation: shimmer 1.2s linear infinite; }
+
+/* Transizioni Vue: <Transition name="page|pop|toast|sheet"> e <TransitionGroup name="list"> */
+.page-enter-active, .page-leave-active { transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease); }
+.page-enter-from { opacity: 0; transform: translateY(12px); }
+.page-leave-to { opacity: 0; transform: translateY(-8px); }
+
+.pop-enter-active { transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease-spring); }
+.pop-leave-active { transition: opacity var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease); }
+.pop-enter-from, .pop-leave-to { opacity: 0; transform: scale(.92); }
+
+.toast-enter-active, .toast-leave-active { transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease-spring); }
+.toast-enter-from, .toast-leave-to { opacity: 0; transform: translateY(16px) scale(.96); }
+
+.sheet-enter-active, .sheet-leave-active { transition: transform var(--dur) var(--ease), opacity var(--dur) var(--ease); }
+.sheet-enter-from, .sheet-leave-to { transform: translateY(100%); opacity: .6; }
+@media (min-width: 768px) { .sheet-enter-from, .sheet-leave-to { transform: translateY(16px) scale(.97); opacity: 0; } }
+
+.list-move, .list-enter-active, .list-leave-active { transition: transform var(--dur) var(--ease), opacity var(--dur) var(--ease); }
+.list-enter-from { opacity: 0; transform: translateX(-16px); }
+.list-leave-to { opacity: 0; transform: translateX(16px); }
+.list-leave-active { position: absolute; width: 100%; }
+
+@keyframes fade-up { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.035); } }
+@keyframes sway { 0%, 100% { transform: rotate(-4deg); } 50% { transform: rotate(4deg); } }
+@keyframes shake { 0%, 100% { transform: none; } 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
+@keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+/* Chi ha attivato "riduci movimento" nel telefono non vede animazioni */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; }
+}
