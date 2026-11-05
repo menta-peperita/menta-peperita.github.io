@@ -4,6 +4,7 @@ import { initLogin } from '../auth'
 import { loading, error } from '../session'
 
 const btn = ref(null)
+const versione = __VERSIONE__
 const errLogin = ref('')
 onMounted(async () => {
   await nextTick()
@@ -25,5 +26,6 @@ onMounted(async () => {
         <p v-if="error || errLogin" :key="error || errLogin" class="error shake" role="alert">{{ error || errLogin }}</p>
       </Transition>
     </section>
+    <small class="muted">Versione {{ versione }}</small>
   </main>
 </template>

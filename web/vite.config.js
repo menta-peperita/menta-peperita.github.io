@@ -1,9 +1,14 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { VitePWA } from 'vite-plugin-pwa'
+import { execSync } from 'node:child_process'
+
+const commit = (() => { try { return execSync('git rev-parse --short HEAD').toString().trim() } catch { return 'dev' } })()
+const quando = new Date().toISOString().slice(0, 16).replace('T', ' ')
 
 export default defineConfig({
   base: '/',
+  define: { __VERSIONE__: JSON.stringify(commit + ' \u00b7 ' + quando) },
   plugins: [
     vue(),
     VitePWA({

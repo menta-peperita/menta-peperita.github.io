@@ -7,6 +7,7 @@ import { iniziali } from '../utenti'
 import Icona from './Icona.vue'
 
 const route = useRoute()
+const versione = __VERSIONE__
 const altroAperto = ref(false)
 const principali = sezioni.filter((s) => s.principale)
 const altre = sezioni.filter((s) => !s.principale)
@@ -23,6 +24,7 @@ watch(() => route.path, () => { altroAperto.value = false })
           <Icona :nome="s.icona" /> {{ s.nome }}
         </RouterLink>
       </nav>
+      <small class="muted versione">Versione {{ versione }}</small>
       <div class="side-user">
         <span class="avatar">{{ iniziali(me.nome) }}</span>
         <span class="side-user-txt"><strong>{{ me.nome }}</strong><small>{{ me.ruolo }}</small></span>
@@ -61,6 +63,7 @@ watch(() => route.path, () => { altroAperto.value = false })
           <Icona :nome="s.icona" /> {{ s.nome }}
         </RouterLink>
         <button class="sheet-link tap danger" @click="esci"><Icona nome="esci" /> Esci</button>
+        <small class="muted versione">Versione {{ versione }}</small>
       </div>
     </Transition>
   </div>
