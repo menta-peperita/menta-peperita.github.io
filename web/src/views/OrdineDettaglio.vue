@@ -227,6 +227,5 @@ async function eliminaOrdine() {
       <label class="field"><span>Data</span><input v-model="pag.data" type="date"></label>
       <button class="btn full" :disabled="occupato || !pag.importo" @click="salvaPagamento">Salva pagamento</button>
     </Sheet>
-    <div v-if="occupato" class="busy" aria-live="polite"><div class="skeleton" style="height: 4px"></div></div>
   </section>
 </template>

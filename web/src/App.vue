@@ -6,6 +6,7 @@ import { carica, pronto } from './store'
 import LoginView from './views/LoginView.vue'
 import AppShell from './components/AppShell.vue'
 import Toast from './components/Toast.vue'
+import Caricamento from './components/Caricamento.vue'
 
 const route = useRoute()
 onMounted(loadMe)
@@ -18,5 +19,6 @@ watch(me, (u) => { if (u && !pronto.value) carica() })
     <AppShell v-if="me" key="app" />
     <LoginView v-else key="login" />
   </Transition>
+  <Caricamento />
   <Toast />
 </template>
