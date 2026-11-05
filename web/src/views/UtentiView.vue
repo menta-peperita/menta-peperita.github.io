@@ -9,9 +9,9 @@ const loading = ref(true)
 const errore = ref('')
 const aperto = ref(false)
 const salvando = ref(false)
-const form = reactive({ id: '', nome: '', email: '', ruolo: 'Socia', attivo: true })
+const form = reactive({ id: '', nome: '', email: '', ruolo: 'Titolare', attivo: true })
 const errori = ref({})
-const puoGestire = computed(() => me.value.ruolo === 'Socia')
+const puoGestire = computed(() => me.value.ruolo === 'Titolare')
 const ordinati = computed(() => [...utenti.value].sort((a, b) => (b.attivo - a.attivo) || a.nome.localeCompare(b.nome, 'it')))
 const isMe = computed(() => form.id && form.id === me.value.id)
 
@@ -20,7 +20,7 @@ onMounted(async () => {
 })
 
 function apri(u) {
-  Object.assign(form, u ? { ...u } : { id: '', nome: '', email: '', ruolo: 'Socia', attivo: true })
+  Object.assign(form, u ? { ...u } : { id: '', nome: '', email: '', ruolo: 'Titolare', attivo: true })
   errori.value = {}
   aperto.value = true
 }
@@ -85,9 +85,9 @@ async function salva() {
         <fieldset class="field">
           <legend>Ruolo</legend>
           <div class="seg">
-            <button v-for="r in ['Socia', 'Aiuto']" :key="r" type="button" :aria-pressed="form.ruolo === r" :disabled="isMe" @click="form.ruolo = r">{{ r }}</button>
+            <button v-for="r in ['Titolare', 'Aiuto']" :key="r" type="button" :aria-pressed="form.ruolo === r" :disabled="isMe" @click="form.ruolo = r">{{ r }}</button>
           </div>
-          <small class="muted">Le socie possono gestire gli utenti; l&rsquo;aiuto no.</small>
+          <small class="muted">I titolari possono gestire gli utenti; l&rsquo;aiuto no.</small>
           <small v-if="errori.ruolo" class="error">{{ errori.ruolo }}</small>
         </fieldset>
         <label v-if="form.id" class="check">

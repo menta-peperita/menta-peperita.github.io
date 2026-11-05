@@ -1,6 +1,6 @@
 /** Menta Peperita - API (Apps Script, collegato al Google Sheet). */
 var VERSION = '0.2.0';
-var RUOLI = ['Socia', 'Aiuto'];
+var RUOLI = ['Titolare', 'Aiuto'];
 
 /** Schema del database: un foglio per tabella, riga 1 = intestazioni. setup() aggiunge solo cio' che manca. */
 var SCHEMA = {
@@ -48,8 +48,8 @@ function validateUtente(input, utenti, me) {
   else if (altri.some(function (u) { return normEmail(u.email) === email; })) e.email = 'Questa email \u00e8 gi\u00e0 usata';
   if (RUOLI.indexOf(input.ruolo) < 0) e.ruolo = 'Ruolo non valido';
   if (input.id && input.id === me.id) {
-    if (!isTrue(input.attivo)) e.attivo = 'Non puoi disattivare te stessa';
-    if (input.ruolo !== 'Socia') e.ruolo = 'Non puoi toglierti il ruolo di Socia';
+    if (!isTrue(input.attivo)) e.attivo = 'Non puoi disattivare il tuo account';
+    if (input.ruolo !== 'Titolare') e.ruolo = 'Non puoi toglierti il ruolo di Titolare';
   }
   return e;
 }
@@ -60,7 +60,7 @@ function describeChanges(oldObj, newObj, fields) {
     .join(', ');
 }
 
-function publicUser(u) { return { id: u.id, nome: u.nome, email: normEmail(u.email), ruolo: u.ruolo, attivo: isTrue(u.attivo) }; }
+function publicUser(u) { return { id: u.id, nome: u.nome, email: normEmail(u.email), ruolo: u.ruolo === 'Socia' ? 'Titolare' : u.ruolo, attivo: isTrue(u.attivo) }; }
 
 // ---------------- HTTP ----------------
 
@@ -90,7 +90,7 @@ function doPost(e) {
 }
 
 function saveUtente_(p, me) {
-  if (me.ruolo !== 'Socia') throw apiError_('FORBIDDEN', 'Solo le socie possono gestire gli utenti');
+  if (me.ruolo !== 'Titolare') throw apiError_('FORBIDDEN', 'Solo i titolari possono gestire gli utenti');
   return withLock_(function () {
     var t = readTable_('Utenti');
     var input = { id: String(p.id || ''), nome: String(p.nome || '').trim(), email: normEmail(p.email), ruolo: p.ruolo, attivo: p.attivo !== false };
@@ -218,10 +218,13 @@ function setup() {
     sh.getRange(1, 1, 1, have.length + missing.length).setFontWeight('bold');
     sh.setFrozenRows(1);
   });
+  var tu = readTable_('Utenti');
+  var colRuolo = tu.headers.indexOf('ruolo') + 1;
+  tu.rows.forEach(function (r) { if (r.ruolo === 'Socia') tu.sheet.getRange(r._row, colRuolo).setValue('Titolare'); });
   if (!readTable_('Utenti').rows.length) {
     var email = Session.getActiveUser().getEmail();
     if (!email) throw new Error('Email non disponibile: esegui setup() dall\'editor con il tuo account');
-    appendRow_('Utenti', { id: 'u1', nome: email.split('@')[0], email: normEmail(email), ruolo: 'Socia', attivo: true, creato_il: new Date(), creato_da: 'setup' });
+    appendRow_('Utenti', { id: 'u1', nome: email.split('@')[0], email: normEmail(email), ruolo: 'Titolare', attivo: true, creato_il: new Date(), creato_da: 'setup' });
   }
   ['Foglio1', 'Sheet1'].forEach(function (n) {
     var f = ss.getSheetByName(n);
