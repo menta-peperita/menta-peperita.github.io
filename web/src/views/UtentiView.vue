@@ -1,6 +1,6 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
-import { utenti, caricaUtenti, salvaUtente, iniziali } from '../utenti'
+import { utenti, caricaUtenti, salvaUtente, eliminaUtente, iniziali } from '../utenti'
 import { me } from '../session'
 import { notify } from '../toast'
 import Icona from '../components/Icona.vue'
@@ -23,6 +23,16 @@ function apri(u) {
   Object.assign(form, u ? { ...u } : { id: '', nome: '', email: '', ruolo: 'Titolare', attivo: true })
   errori.value = {}
   aperto.value = true
+}
+
+async function elimina() {
+  if (!confirm('Eliminare ' + form.nome + '? Si pu\u00f2 fare solo se non ha mai usato l\u2019app.')) return
+  salvando.value = true
+  try {
+    await eliminaUtente(form.id)
+    aperto.value = false
+    notify(form.nome + ' eliminato')
+  } catch (e) { notify(e.message, 'err') } finally { salvando.value = false }
 }
 
 async function salva() {
@@ -95,6 +105,8 @@ async function salva() {
         </label>
         <small v-if="errori.attivo" class="error">{{ errori.attivo }}</small>
         <button class="btn full" :disabled="salvando">{{ salvando ? 'Salvataggio\u2026' : 'Salva' }}</button>
+        <button v-if="form.id && !isMe" type="button" class="btn ghost danger full" :disabled="salvando" @click="elimina">Elimina utente</button>
+        <small v-if="form.id && !isMe" class="muted">Si pu&ograve; eliminare solo chi non ha mai fatto nulla nell&rsquo;app. Altrimenti disattivalo: non entra pi&ugrave;, ma lo storico resta.</small>
       </form>
     </Transition>
   </section>

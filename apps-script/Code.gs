@@ -60,6 +60,20 @@ function describeChanges(oldObj, newObj, fields) {
     .join(', ');
 }
 
+/** Colonne che collegano un dato a un utente: se ce n'e' anche solo una, l'utente non si elimina (si disattiva). */
+var USER_REF_COLS = ['utente_id', 'creato_da', 'assegnato_a', 'pagato_da'];
+
+function countUserRefs(userId, tables) {
+  var n = 0;
+  Object.keys(tables).forEach(function (name) {
+    tables[name].forEach(function (r) {
+      if (name === 'Utenti' && r.id === userId) return;
+      USER_REF_COLS.forEach(function (c) { if (r[c] === userId) n++; });
+    });
+  });
+  return n;
+}
+
 function publicUser(u) { return { id: u.id, nome: u.nome, email: normEmail(u.email), ruolo: u.ruolo === 'Socia' ? 'Titolare' : u.ruolo, attivo: isTrue(u.attivo) }; }
 
 // ---------------- HTTP ----------------
@@ -68,6 +82,7 @@ var ACTIONS = {
   whoami: function (p, me) { return me; },
   'utenti.list': function () { return readTable_('Utenti').rows.map(publicUser); },
   'utenti.save': function (p, me) { return saveUtente_(p, me); },
+  'utenti.delete': function (p, me) { return deleteUtente_(p, me); },
   'attivita.list': function (p) {
     var lim = Math.min(Math.max(Number(p.limit) || 50, 1), 200);
     return readTable_('Attivita').rows.slice(-lim).reverse().map(clean_);
@@ -112,6 +127,26 @@ function saveUtente_(p, me) {
       log_(me, 'modifica', 'utente', input.id, changes);
     }
     return publicUser(input);
+  });
+}
+
+function deleteUtente_(p, me) {
+  if (me.ruolo !== 'Titolare') throw apiError_('FORBIDDEN', 'Solo i titolari possono gestire gli utenti');
+  if (!p.id) throw apiError_('VALIDATION', 'Utente non indicato');
+  if (p.id === me.id) throw apiError_('FORBIDDEN', 'Non puoi eliminare il tuo account');
+  return withLock_(function () {
+    var t = readTable_('Utenti');
+    var u = t.rows.filter(function (r) { return r.id === p.id; })[0];
+    if (!u) throw apiError_('NOT_FOUND', 'Utente non trovato');
+    var tables = {};
+    Object.keys(SCHEMA).forEach(function (name) {
+      if (SCHEMA[name].some(function (c) { return USER_REF_COLS.indexOf(c) >= 0; })) tables[name] = readTable_(name).rows;
+    });
+    var n = countUserRefs(u.id, tables);
+    if (n) throw apiError_('IN_USE', u.nome + ' ha gi\u00e0 ' + n + (n === 1 ? ' dato collegato' : ' dati collegati') + ': disattivalo invece di eliminarlo, cos\u00ec lo storico resta corretto');
+    t.sheet.deleteRow(u._row);
+    log_(me, 'elimina', 'utente', u.id, u.nome + ' (' + normEmail(u.email) + ')');
+    return { id: u.id };
   });
 }
 

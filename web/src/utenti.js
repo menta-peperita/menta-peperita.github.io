@@ -23,4 +23,9 @@ export async function salvaUtente(u) {
   return saved
 }
 
+export async function eliminaUtente(id) {
+  await call('utenti.delete', { id })
+  utenti.value = utenti.value.filter((u) => u.id !== id)
+}
+
 export const iniziali = (nome) => String(nome || '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('')

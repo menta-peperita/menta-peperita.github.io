@@ -60,3 +60,19 @@ test('utente pubblico normalizza email e attivo', () => {
   assert.deepEqual(plain(ctx.publicUser({ id: 'u2', nome: 'M', email: ' M@X.it', ruolo: 'Socia', attivo: 'TRUE', _row: 3 })),
     { id: 'u2', nome: 'M', email: 'm@x.it', ruolo: 'Titolare', attivo: true })
 })
+test('utente senza dati collegati si puo eliminare', () => {
+  const tables = {
+    Utenti: [{ id: 'u1', creato_da: 'setup' }, { id: 'u3', creato_da: 'u1' }],
+    Attivita: [{ id: 'a1', utente_id: 'u1', entita_id: 'u3' }]
+  }
+  assert.equal(ctx.countUserRefs('u3', tables), 0)
+})
+test('utente con dati collegati non si elimina', () => {
+  const tables = {
+    Utenti: [{ id: 'u1' }, { id: 'u2', creato_da: 'u1' }, { id: 'u4', creato_da: 'u2' }],
+    Attivita: [{ utente_id: 'u2' }, { utente_id: 'u2' }],
+    Ordini: [{ assegnato_a: 'u2', creato_da: 'u1' }],
+    Spese: [{ pagato_da: 'u2' }]
+  }
+  assert.equal(ctx.countUserRefs('u2', tables), 5)
+})
