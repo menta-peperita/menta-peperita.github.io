@@ -10,14 +10,14 @@ import { notify } from '../toast'
 import Icona from '../components/Icona.vue'
 
 const titolare = computed(() => me.value.ruolo === 'Titolare')
-const f = reactive({ instagram: '', whatsapp: '', messaggio_ricevuto: '', messaggio_pronto: '', messaggio_pagamento: '', checklist: '' })
+const f = reactive({ costo_orario: '', instagram: '', whatsapp: '', messaggio_ricevuto: '', messaggio_pronto: '', messaggio_pagamento: '', checklist: '' })
 const salvando = ref(false)
 const linkCatalogo = location.origin + '/catalogo'
 watch(pronto, () => {
   const i = db.Impostazioni
   let cl = CHECKLIST_DEFAULT
   try { const v = JSON.parse(i.checklist_mercatino || 'null'); if (Array.isArray(v)) cl = v } catch {}
-  Object.assign(f, { instagram: i.instagram || '', whatsapp: i.whatsapp || '', messaggio_ricevuto: i.messaggio_ricevuto || MODELLI.ricevuto, messaggio_pronto: i.messaggio_pronto || MODELLI.pronto, messaggio_pagamento: i.messaggio_pagamento || MODELLI.pagamento, checklist: cl.join('\n') })
+  Object.assign(f, { costo_orario: i.costo_orario || '', instagram: i.instagram || '', whatsapp: i.whatsapp || '', messaggio_ricevuto: i.messaggio_ricevuto || MODELLI.ricevuto, messaggio_pronto: i.messaggio_pronto || MODELLI.pronto, messaggio_pagamento: i.messaggio_pagamento || MODELLI.pagamento, checklist: cl.join('\n') })
 }, { immediate: true })
 
 async function salva() {
@@ -41,6 +41,11 @@ async function copiaLink() { notify((await copia(linkCatalogo)) ? 'Link copiato'
     <h1 class="title">Impostazioni</h1>
     <p v-if="!titolare" class="muted hint">Solo i titolari possono modificare queste impostazioni.</p>
     <form class="form stagger" @submit.prevent="salva">
+      <div class="card">
+        <h2 class="h2">Costi</h2>
+        <label class="field"><span>Costo orario del vostro lavoro &euro;/ora</span><input v-model="f.costo_orario" type="text" inputmode="decimal" placeholder="es. 10" :disabled="!titolare"></label>
+        <small class="muted">Serve a calcolare il costo pieno dei prodotti (materiali + tempo) in Statistiche. Lascia vuoto se non vi interessa.</small>
+      </div>
       <div class="card">
         <h2 class="h2">Catalogo pubblico</h2>
         <p class="muted">Una pagina con prodotti e prezzi da mandare a chi chiede &ldquo;cosa fate?&rdquo;. Mostra solo i prodotti con &ldquo;Mostra nel catalogo&rdquo;.</p>

@@ -76,3 +76,18 @@ test('testo messaggio', () => {
   const t = c.testoMessaggio('pronto', { nome: 'Bea', numero: 'MP-002', prodotti: '5 Tovaglietta', residuo_frase: '' })
   assert.equal(t, 'Ciao Bea! Il tuo ordine MP-002 \u00e8 pronto: 5 Tovaglietta.')
 })
+test('costi per prodotto con tempo e costo orario', () => {
+  const db = base()
+  db.Prodotti[0].tempo_min = 30
+  const r = c.costiProdotti(db, '2026-11-01', '2026-11-30', 10)
+  const t = r.find((x) => x.id === 'p1')
+  assert.equal(t.margine, 7.6)
+  assert.equal(t.marginePerc, 95)
+  assert.equal(t.guadagnoOra, 15.2)
+  assert.equal(t.costoPieno, 5.4)
+  assert.equal(t.sottoCosto, false)
+  assert.equal(t.venduti, 5) // o1; o3 fuori periodo, o4 annullato
+  assert.equal(t.margineTotale, 33) // (7 - 0.4) * 5
+  db.Prodotti[0].prezzo = 5
+  assert.equal(c.costiProdotti(db, '', '', 10).find((x) => x.id === 'p1').sottoCosto, true)
+})

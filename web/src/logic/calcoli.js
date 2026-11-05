@@ -140,3 +140,34 @@ export const MODELLI = {
 export function testoMessaggio(tipo, v, modelli = {}) {
   return (modelli[tipo] || MODELLI[tipo]).replace(/\{(\w+)\}/g, (_, k) => (v[k] == null ? '' : String(v[k])))
 }
+
+/** Costi per prodotto: materiali, tempo, margine, guadagno all'ora e vendite del periodo. */
+export function costiProdotti(db, da, a, costoOrario) {
+  const orario = num(costoOrario)
+  const inP = (d) => (!da || d >= da) && (!a || d <= a)
+  const ordiniP = new Set(db.Ordini.filter((o) => o.stato !== 'annullato' && inP(o.data)).map((o) => o.id))
+  return db.Prodotti.map((p) => {
+    const { prezzo, costo, completo, margine } = margineProdotto(p, db)
+    const minuti = num(p.tempo_min)
+    const costoTempo = orario != null && minuti != null ? r2((orario * minuti) / 60) : null
+    const costoPieno = costoTempo != null ? r2(costo + costoTempo) : null
+    let venduti = 0
+    let margineTotale = 0
+    for (const r of db.RigheOrdine) {
+      if (r.prodotto_id !== p.id || !ordiniP.has(r.ordine_id)) continue
+      const q = Number(r.quantita || 0)
+      venduti += q
+      const pu = num(r.prezzo_unitario)
+      const cu = num(r.costo_unitario) ?? costo
+      if (pu != null) margineTotale += (pu - cu) * q
+    }
+    return {
+      id: p.id, nome: p.nome, attivo: p.attivo === true || p.attivo === 'TRUE',
+      prezzo, costo, completo, margine,
+      marginePerc: prezzo ? Math.round((margine / prezzo) * 100) : null,
+      minuti, guadagnoOra: margine != null && minuti ? r2(margine / (minuti / 60)) : null,
+      costoPieno, sottoCosto: prezzo != null && costoPieno != null && prezzo < costoPieno,
+      venduti, margineTotale: r2(margineTotale)
+    }
+  }).sort((x, y) => (y.guadagnoOra ?? -1e9) - (x.guadagnoOra ?? -1e9) || y.venduti - x.venduti)
+}

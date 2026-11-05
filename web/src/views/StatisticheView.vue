@@ -3,7 +3,7 @@ import { ref, computed, watch } from 'vue'
 import { db, pronto, salva, nomeUtente, nomeProdotto } from '../store'
 import { me } from '../session'
 import { call } from '../api'
-import { statistiche, divisioneUtili, riepilogoOrdine, calcolaCassa, euro, oggi, r2 } from '../logic/calcoli'
+import { statistiche, divisioneUtili, riepilogoOrdine, calcolaCassa, costiProdotti, euro, oggi, r2 } from '../logic/calcoli'
 import { scaricaCsv } from '../media'
 import { notify } from '../toast'
 import Seg from '../components/Seg.vue'
@@ -20,6 +20,8 @@ const range = computed(() => {
   return ['', '']
 })
 const s = computed(() => statistiche(db, ...range.value))
+const costi = computed(() => costiProdotti(db, ...range.value, db.Impostazioni.costo_orario).filter((p) => p.attivo || p.venduti))
+const orario = computed(() => db.Impostazioni.costo_orario || '')
 const max = (arr) => Math.max(1, ...arr.map((x) => x.n))
 const kpi = computed(() => [
   ['Ordini', s.value.ordini], ['Venduto', euro(s.value.venduto)], ['Incassato', euro(s.value.incassato)], ['Spese', euro(s.value.spese)],
@@ -83,6 +85,29 @@ function esporta() {
         <h2 class="h2">Da dove arrivano gli ordini</h2>
         <div v-for="x in s.canali" :key="x.nome" class="bar"><div class="head-row"><span>{{ x.nome }}</span><strong>{{ x.n }}</strong></div><div class="track"><div class="fill chili" :style="{ width: (x.n / max(s.canali)) * 100 + '%' }"></div></div></div>
         <small class="muted">Margine sui materiali nel periodo: {{ euro(s.margineMateriali) }}</small>
+      </div>
+      <div class="card">
+        <h2 class="h2">Costi per prodotto</h2>
+        <p class="muted">Ordinati per guadagno all&rsquo;ora. Venduti e margine totale si riferiscono al periodo scelto.<template v-if="orario"> Costo del lavoro: {{ euro(orario) }}/ora.</template><template v-else> Imposta il costo orario del lavoro in Impostazioni per vedere il costo pieno.</template></p>
+        <div class="table-wrap">
+          <table class="tab">
+            <thead><tr><th>Prodotto</th><th>Materiali</th><th>Prezzo</th><th>Margine</th><th>Minuti</th><th>&euro;/ora</th><th v-if="orario">Costo pieno</th><th>Venduti</th><th>Margine tot.</th></tr></thead>
+            <tbody>
+              <tr v-for="p in costi" :key="p.id" :class="{ alert: p.sottoCosto }">
+                <td><strong>{{ p.nome }}</strong><small v-if="!p.completo" class="muted"> costi incompleti</small></td>
+                <td>{{ euro(p.costo) }}</td>
+                <td>{{ p.prezzo == null ? '\u2014' : euro(p.prezzo) }}</td>
+                <td :class="p.margine != null && p.margine < 0 ? 'neg' : ''">{{ p.margine == null ? '\u2014' : euro(p.margine) }}<small v-if="p.marginePerc != null" class="muted"> {{ p.marginePerc }}%</small></td>
+                <td>{{ p.minuti ?? '\u2014' }}</td>
+                <td class="pos">{{ p.guadagnoOra == null ? '\u2014' : euro(p.guadagnoOra) }}</td>
+                <td v-if="orario" :class="p.sottoCosto ? 'neg' : ''">{{ p.costoPieno == null ? '\u2014' : euro(p.costoPieno) }}<small v-if="p.sottoCosto"> sotto costo</small></td>
+                <td>{{ p.venduti }}</td>
+                <td>{{ euro(p.margineTotale) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <small class="muted">Margine = prezzo &minus; materiali. &euro;/ora = margine diviso il tempo per farlo. Costo pieno = materiali + tempo al costo orario.</small>
       </div>
       <div class="card">
         <h2 class="h2">Divisione utili</h2>

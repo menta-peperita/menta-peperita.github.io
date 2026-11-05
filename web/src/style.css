@@ -186,3 +186,8 @@ textarea { padding: 12px 14px; resize: vertical; }
 .oppure { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; }
 .oppure::before, .oppure::after { content: ''; flex: 1; height: 1px; background: var(--line); }
 .codice { letter-spacing: 8px; font-size: 22px !important; text-align: center; font-weight: 800; }
+.table-wrap { overflow-x: auto; margin: 0 -4px; }
+.tab { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 640px; }
+.tab th { text-align: left; font-size: 12px; color: var(--muted); font-weight: 800; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.tab td { padding: 10px 8px; border-bottom: 1px solid #F0F0F0; white-space: nowrap; }
+.tab tr.alert td { background: #FDF0EF; }

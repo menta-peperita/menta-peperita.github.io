@@ -491,7 +491,7 @@ function setImpostazione_(chiave, valore) {
   if (r) t.sheet.getRange(r._row, 2).setValue(valore); else t.sheet.appendRow([chiave, valore]);
 }
 
-var CHIAVI_PUBBLICHE = ['instagram', 'whatsapp', 'quote', 'messaggio_ricevuto', 'messaggio_pronto', 'messaggio_pagamento', 'checklist_mercatino'];
+var CHIAVI_PUBBLICHE = ['instagram', 'whatsapp', 'quote', 'costo_orario', 'messaggio_ricevuto', 'messaggio_pronto', 'messaggio_pagamento', 'checklist_mercatino'];
 
 function salvaImpostazione_(p, me) {
   soloTitolare_(me);
