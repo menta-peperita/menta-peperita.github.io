@@ -39,11 +39,21 @@ export async function initLogin(buttonEl) {
     gis.initialize({
       client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
       auto_select: true,
-      callback: (r) => { setToken(r.credential); waiters.splice(0).forEach((w) => w(true)) }
+      callback: async (r) => {
+        // Il login Google vale un'ora: lo scambiamo subito con una sessione di 60 giorni dell'app.
+        try {
+          const { call } = await import('./api')
+          const s = await call('auth.google', { idToken: r.credential, dispositivo: navigator.userAgent.slice(0, 120) })
+          setSessione(s.sessione)
+        } catch {
+          setToken(r.credential)
+        }
+        waiters.splice(0).forEach((w) => w(true))
+      }
     })
   }
   if (buttonEl) gis.renderButton(buttonEl, { theme: 'outline', size: 'large', shape: 'pill', locale: 'it' })
-  if (!isValid()) gis.prompt()
+  if (!isValid() && !sessione.value) gis.prompt()
 }
 
 /** Garantisce un token valido per almeno 5 minuti; se serve chiede a Google un rinnovo silenzioso. */

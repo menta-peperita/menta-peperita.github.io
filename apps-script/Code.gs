@@ -153,7 +153,11 @@ var PUBLIC_ACTIONS = {
   'auth.codice.invia': function (p) { return inviaCodice_(p); },
   'auth.codice.verifica': function (p) { return verificaCodice_(p); },
   'auth.password': function (p) { return loginPassword_(p); },
-  'auth.esci': function (p) { return esci_(p); }
+  'auth.esci': function (p) { return esci_(p); },
+  'auth.google': function (p) {
+    var u = authenticate_(p.idToken);
+    return creaSessione_(utentePerEmail_(u.email), p.dispositivo);
+  }
 };
 
 var ACTIONS = {
