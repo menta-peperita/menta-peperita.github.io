@@ -15,7 +15,17 @@ const conti = computed(() => contiPersone(db))
 const inGiro = computed(() => conti.value.reduce((t, p) => t + Math.abs(p.netto), 0))
 const aperto = ref('')
 const TIPI = { INCASSO: 'Incasso', VERSAMENTO: 'Versato in cassa', RIMBORSO: 'Rimborso spesa', PRELIEVO: 'Prelievo utili' }
-const movimenti = computed(() => [...db.Movimenti].sort((a, b) => String(b.data).localeCompare(String(a.data)) || String(b.id).localeCompare(String(a.id), 'it', { numeric: true })).slice(0, 100))
+const chi = ref('')
+const tipo = ref('')
+const nomiMov = computed(() => {
+  const ids = [...new Set(db.Movimenti.map((m) => m.utente_id).filter(Boolean))]
+  return ids.map((id) => ({ value: id, label: id === 'cassa' ? 'Cassa comune' : nomeUtente(id) })).sort((a, b) => a.label.localeCompare(b.label, 'it'))
+})
+const filtrati = computed(() => db.Movimenti
+  .filter((m) => (!chi.value || m.utente_id === chi.value) && (!tipo.value || m.tipo === tipo.value))
+  .sort((a, b) => String(b.data).localeCompare(String(a.data)) || String(b.id).localeCompare(String(a.id), 'it', { numeric: true })))
+const movimenti = computed(() => filtrati.value.slice(0, 150))
+const sommaFiltrati = computed(() => filtrati.value.reduce((t, m) => t + Number(m.importo || 0), 0))
 const effetto = (m) => (m.tipo === 'VERSAMENTO' || (m.tipo === 'INCASSO' && m.utente_id === 'cassa') ? 'in' : m.tipo === 'INCASSO' ? '' : 'out')
 const numeroOrdine = (id) => db.Ordini.find((o) => o.id === id)?.numero || ''
 const persone = computed(() => db.Utenti.map((u) => ({ value: u.id, label: u.nome })))
@@ -101,7 +111,22 @@ async function eliminaMov(m) {
       </div>
 
       <h2 class="h2">Movimenti</h2>
-      <Vuoto v-if="!movimenti.length" testo="Ancora nessun movimento." />
+      <div class="grid2">
+        <select v-model="chi" aria-label="Filtra per persona">
+          <option value="">Tutte le persone</option>
+          <option v-for="n in nomiMov" :key="n.value" :value="n.value">{{ n.label }}</option>
+        </select>
+        <select v-model="tipo" aria-label="Filtra per tipo">
+          <option value="">Tutti i tipi</option>
+          <option v-for="(l, k) in TIPI" :key="k" :value="k">{{ l }}</option>
+        </select>
+      </div>
+      <p v-if="chi || tipo" class="riepilogo-filtro">
+        <span>{{ filtrati.length }} {{ filtrati.length === 1 ? 'movimento' : 'movimenti' }}</span>
+        <span>Totale <strong>{{ euro(sommaFiltrati) }}</strong></span>
+        <button class="link-btn" @click="chi = ''; tipo = ''">Togli filtri</button>
+      </p>
+      <Vuoto v-if="!movimenti.length" :testo="chi || tipo ? 'Nessun movimento con questi filtri.' : 'Ancora nessun movimento.'" />
       <TransitionGroup name="list" tag="ul" class="list">
         <li v-for="m in movimenti" :key="m.id" class="act">
           <p>
