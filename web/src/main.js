@@ -4,6 +4,9 @@ import App from './App.vue'
 import router from './router'
 import './style.css'
 import './motion.css'
+import { applicaTema } from './tema'
+
+applicaTema()
 
 createApp(App).use(router).mount('#app')
 

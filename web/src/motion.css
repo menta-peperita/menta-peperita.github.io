@@ -31,7 +31,7 @@
 .shake { animation: shake 420ms var(--ease); }
 
 /* Caricamento a scheletro */
-.skeleton { border-radius: 10px; background: linear-gradient(90deg, #EFEFEA 25%, #F7F7F3 50%, #EFEFEA 75%); background-size: 200% 100%; animation: shimmer 1.2s linear infinite; }
+.skeleton { border-radius: 10px; background: linear-gradient(90deg, var(--sk1) 25%, var(--sk2) 50%, var(--sk1) 75%); background-size: 200% 100%; animation: shimmer 1.2s linear infinite; }
 
 /* Transizioni Vue: <Transition name="page|pop|toast|sheet"> e <TransitionGroup name="list"> */
 .page-enter-active, .page-leave-active { transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease); }

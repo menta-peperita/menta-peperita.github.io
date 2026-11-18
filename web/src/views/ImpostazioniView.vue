@@ -8,6 +8,8 @@ import { CHECKLIST_DEFAULT } from '../eventi'
 import { copia } from '../media'
 import { notify } from '../toast'
 import Icona from '../components/Icona.vue'
+import Seg from '../components/Seg.vue'
+import { tema, applicaTema } from '../tema'
 
 const titolare = computed(() => me.value.ruolo === 'Titolare')
 const f = reactive({ costo_orario: '', instagram: '', whatsapp: '', messaggio_ricevuto: '', messaggio_pronto: '', messaggio_pagamento: '', checklist: '' })
@@ -41,6 +43,11 @@ async function copiaLink() { notify((await copia(linkCatalogo)) ? 'Link copiato'
     <h1 class="title">Impostazioni</h1>
     <p v-if="!titolare" class="muted hint">Solo i titolari possono modificare queste impostazioni.</p>
     <form class="form stagger" @submit.prevent="salva">
+      <div class="card">
+        <h2 class="h2">Aspetto</h2>
+        <Seg :model-value="tema" :opzioni="[{ value: 'auto', label: 'Automatico' }, { value: 'light', label: 'Chiaro' }, { value: 'dark', label: 'Scuro' }]" @update:model-value="applicaTema" />
+        <small class="muted">Automatico segue il tema del telefono o del PC. Vale solo per questo dispositivo.</small>
+      </div>
       <div class="card">
         <h2 class="h2">Costi</h2>
         <label class="field"><span>Costo orario del vostro lavoro &euro;/ora</span><input v-model="f.costo_orario" type="text" inputmode="decimal" placeholder="es. 10" :disabled="!titolare"></label>
