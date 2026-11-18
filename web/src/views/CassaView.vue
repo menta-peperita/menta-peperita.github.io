@@ -1,6 +1,6 @@
 <script setup>
 import { ref, reactive, computed } from 'vue'
-import { db, pronto, salva, elimina, azione, nomeUtente, carica } from '../store'
+import { db, pronto, salva, elimina, azione, nomeUtente, nomeProdotto, carica } from '../store'
 import { me } from '../session'
 import { calcolaCassa, contiPersone, euro, fmtData, oggi } from '../logic/calcoli'
 import { METODI } from '../stati'
@@ -28,6 +28,27 @@ const movimenti = computed(() => filtrati.value.slice(0, 150))
 const sommaFiltrati = computed(() => filtrati.value.reduce((t, m) => t + Number(m.importo || 0), 0))
 const effetto = (m) => (m.tipo === 'VERSAMENTO' || (m.tipo === 'INCASSO' && m.utente_id === 'cassa') ? 'in' : m.tipo === 'INCASSO' ? '' : 'out')
 const numeroOrdine = (id) => db.Ordini.find((o) => o.id === id)?.numero || ''
+
+/** Descrizione leggibile di un movimento: a cosa si riferisce. */
+function descrizione(m) {
+  if (m.ordine_id) {
+    const o = db.Ordini.find((x) => x.id === m.ordine_id)
+    if (!o) return 'Ordine eliminato'
+    const cliente = db.Clienti.find((c) => c.id === o.cliente_id)?.nome
+    const ev = o.evento_id ? db.Eventi.find((e) => e.id === o.evento_id)?.nome : ''
+    const prodotti = db.RigheOrdine.filter((r) => r.ordine_id === o.id).map((r) => r.quantita + ' \u00d7 ' + (nomeProdotto(r.prodotto_id) || r.descrizione)).join(', ')
+    return [o.numero, cliente || (ev ? 'Banco ' + ev : ''), prodotti].filter(Boolean).join(' \u00b7 ')
+  }
+  if (m.spesa_id) {
+    const s = db.Spese.find((x) => x.id === m.spesa_id)
+    return s ? 'Spesa: ' + s.descrizione + (s.negozio ? ' (' + s.negozio + ')' : '') + ' del ' + fmtData(s.data) : 'Spesa eliminata'
+  }
+  if (m.tipo === 'VERSAMENTO') return nomeUtente(m.utente_id) + ' ha messo in cassa i soldi incassati'
+  if (m.tipo === 'PRELIEVO') return 'Soldi presi dalla cassa da ' + nomeUtente(m.utente_id)
+  if (m.tipo === 'INCASSO') return m.evento_id ? 'Incasso al ' + (db.Eventi.find((e) => e.id === m.evento_id)?.nome || 'mercatino') : 'Incasso senza ordine'
+  return ''
+}
+const link = (m) => (m.ordine_id && db.Ordini.some((o) => o.id === m.ordine_id) ? '/ordini/' + m.ordine_id : m.spesa_id ? '/spese' : '')
 const persone = computed(() => db.Utenti.map((u) => ({ value: u.id, label: u.nome })))
 const titolare = computed(() => me.value.ruolo === 'Titolare')
 
@@ -129,11 +150,13 @@ async function eliminaMov(m) {
       <Vuoto v-if="!movimenti.length" :testo="chi || tipo ? 'Nessun movimento con questi filtri.' : 'Ancora nessun movimento.'" />
       <TransitionGroup name="list" tag="ul" class="list">
         <li v-for="m in movimenti" :key="m.id" class="act">
-          <p>
-            <strong>{{ TIPI[m.tipo] || m.tipo }}</strong>
-            <span class="muted"> &middot; {{ m.utente_id === 'cassa' ? 'in cassa' : nomeUtente(m.utente_id) }}<template v-if="m.ordine_id"> &middot; {{ numeroOrdine(m.ordine_id) }}</template><template v-if="m.metodo"> &middot; {{ m.metodo }}</template><template v-if="m.note"> &middot; {{ m.note }}</template></span><br>
-            <small class="muted">{{ fmtData(m.data) }}</small>
-          </p>
+          <div class="mov">
+            <p class="mov-titolo"><strong>{{ TIPI[m.tipo] || m.tipo }}</strong> <span class="muted">&middot; {{ m.utente_id === 'cassa' ? 'in cassa' : nomeUtente(m.utente_id) }}<template v-if="m.metodo"> &middot; {{ m.metodo }}</template></span></p>
+            <RouterLink v-if="link(m)" :to="link(m)" class="mov-desc">{{ descrizione(m) }}</RouterLink>
+            <p v-else-if="descrizione(m)" class="mov-desc">{{ descrizione(m) }}</p>
+            <p v-if="m.note" class="mov-nota">{{ m.note }}</p>
+            <small class="muted">{{ fmtData(m.data) }}<template v-if="m.creato_da && m.creato_da !== 'import'"> &middot; registrato da {{ nomeUtente(m.creato_da) }}</template></small>
+          </div>
           <span class="azioni-riga">
             <strong :class="effetto(m) === 'in' ? 'pos' : effetto(m) === 'out' ? 'neg' : ''">{{ effetto(m) === 'in' ? '+' : effetto(m) === 'out' ? '\u2212' : '' }}{{ euro(m.importo) }}</strong>
             <button v-if="titolare" class="icon-btn" aria-label="Elimina movimento" @click="eliminaMov(m)"><Icona nome="cestino" :size="18" /></button>

@@ -237,3 +237,8 @@ textarea { padding: 12px 14px; resize: vertical; }
 .conto-head { all: unset; display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 700; }
 .conto-det { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; background: #fff; border-radius: 10px; font-size: 14px; }
 .blocker { position: fixed; inset: 0; z-index: 45; background: rgba(255,255,255,.35); cursor: progress; touch-action: none; }
+.mov { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.mov p { margin: 0; }
+.mov-desc { color: var(--ink); font-size: 14px; text-decoration: none; }
+a.mov-desc { color: var(--accent-ink); text-decoration: underline; text-underline-offset: 2px; }
+.mov-nota { font-size: 13px; font-style: italic; color: #3A3A3A; }
