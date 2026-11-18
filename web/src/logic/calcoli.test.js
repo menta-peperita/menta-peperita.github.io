@@ -40,7 +40,8 @@ test('costo e margine prodotto', () => {
 })
 test('riepilogo ordine: acconto, pagato, da definire', () => {
   const db = base()
-  assert.deepEqual({ ...c.riepilogoOrdine(db.Ordini[0], db), righe: 0 }, { righe: 0, totale: 35, definito: true, incassato: 20, residuo: 15, pagamento: 'acconto' })
+  const r1 = c.riepilogoOrdine(db.Ordini[0], db)
+  assert.deepEqual([r1.totale, r1.definito, r1.incassato, r1.residuo, r1.pagamento], [35, true, 20, 15, 'acconto'])
   assert.equal(c.riepilogoOrdine(db.Ordini[1], db).pagamento, 'pagato')
   assert.equal(c.riepilogoOrdine(db.Ordini[2], db).pagamento, 'da_definire')
 })
@@ -102,4 +103,20 @@ test('tempo misurato: solo ordini con un unico prodotto', () => {
   const t = c.costiProdotti(db, '', '', null).find((x) => x.id === 'p1')
   assert.equal(t.fonteTempo, 'misurato')
   assert.equal(t.minuti, 10.26)
+})
+test('totale finale: sconto, pagamento e statistiche', () => {
+  const db = base()
+  db.Ordini[0].totale_finale = 30
+  const r = c.riepilogoOrdine(db.Ordini[0], db)
+  assert.deepEqual([r.totale, r.sommaRighe, r.totaleFinale, r.residuo, r.pagamento], [30, 35, true, 10, 'acconto'])
+  db.Ordini[2].totale_finale = 200
+  assert.equal(c.riepilogoOrdine(db.Ordini[2], db).pagamento, 'da_incassare')
+  assert.equal(c.statistiche(db, '2026-11-01', '2026-11-30').venduto, 40)
+  assert.equal(c.costiProdotti(db, '2026-11-01', '2026-11-30', null).find((x) => x.id === 'p1').margineTotale, 28)
+})
+test('conti per persona: netto e spese aperte', () => {
+  const db = base()
+  db.Spese[1].stato_rimborso = 'da_rimborsare'
+  const conti = c.contiPersone(db)
+  assert.deepEqual(conti.map((p) => [p.id, p.netto, p.speseAperte.length]), [['u1', -35, 1], ['u2', 5, 0]])
 })

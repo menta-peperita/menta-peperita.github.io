@@ -1,6 +1,7 @@
 import { ref, watch } from 'vue'
 import { call } from './api'
 import { token, sessione, autenticato, logout } from './auth'
+import { svuotaCache } from './store'
 
 export const me = ref(null)
 export const loading = ref(false)
@@ -18,6 +19,7 @@ export async function loadMe() {
 export function esci() {
   if (sessione.value) call('auth.esci', { sessione: sessione.value }).catch(() => {})
   logout()
+  svuotaCache()
   me.value = null
 }
 

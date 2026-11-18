@@ -22,13 +22,15 @@ const lista = computed(() => {
       return {
         ...o, r,
         cliente: db.Clienti.find((c) => c.id === o.cliente_id)?.nome || (o.evento_id ? 'Vendita al banco' : 'Senza nome'),
-        prodotti: r.righe.map((x) => x.quantita + ' \u00d7 ' + (nomeProdotto(x.prodotto_id) || x.descrizione)).join(', '),
+        prodotti: r.righe.map((x) => x.quantita + ' \u00d7 ' + (nomeProdotto(x.prodotto_id) || x.descrizione) + (x.note ? ' ' + x.note : '')).join(', '),
+        linee: r.righe.map((x) => ({ testo: x.quantita + ' \u00d7 ' + (nomeProdotto(x.prodotto_id) || x.descrizione) + (x.variante_id ? ' \u00b7 ' + (db.Varianti.find((v) => v.id === x.variante_id)?.nome || '') : ''), note: x.note })),
         ritardo: o.consegna_entro && o.consegna_entro < oggiS && ['lavorazione', 'pronto'].includes(o.stato)
       }
     })
     .filter((o) => !q || (o.cliente + ' ' + o.numero + ' ' + o.prodotti).toLowerCase().includes(q))
     .sort((a, b) => String(b.data).localeCompare(String(a.data)) || String(b.numero).localeCompare(String(a.numero)))
 })
+const totali = computed(() => lista.value.reduce((t, o) => ({ n: t.n + 1, totale: t.totale + o.r.totale, residuo: t.residuo + o.r.residuo }), { n: 0, totale: 0, residuo: 0 }))
 </script>
 
 <template>
@@ -39,6 +41,13 @@ const lista = computed(() => {
     </div>
     <Seg v-model="filtro" :opzioni="filtri" class="scroll-x" />
     <input v-model="cerca" type="search" class="search" placeholder="Cerca cliente, numero o prodotto" aria-label="Cerca">
+    <Transition name="pop" mode="out-in">
+      <p v-if="pronto && totali.n" :key="filtro + totali.n" class="riepilogo-filtro">
+        <span>{{ totali.n }} {{ totali.n === 1 ? 'ordine' : 'ordini' }}</span>
+        <span>Totale <strong>{{ euro(totali.totale) }}</strong></span>
+        <span v-if="totali.residuo > 0">Da incassare <strong class="neg">{{ euro(totali.residuo) }}</strong></span>
+      </p>
+    </Transition>
     <div v-if="!pronto" class="col"><div v-for="i in 4" :key="i" class="skeleton" style="height: 96px"></div></div>
     <Vuoto v-else-if="!lista.length" testo="Nessun ordine in questa vista." />
     <TransitionGroup v-else name="list" tag="ul" class="list">
@@ -49,7 +58,10 @@ const lista = computed(() => {
             <span class="badge" :class="STATI[o.stato]?.cls">{{ STATI[o.stato]?.label || o.stato }}</span>
           </div>
           <strong class="big">{{ o.cliente }}</strong>
-          <span class="muted">{{ o.prodotti }}</span>
+          <ul class="linee">
+            <li v-for="(l, i) in o.linee" :key="i"><span>{{ l.testo }}</span><span v-if="l.note" class="nota-riga">{{ l.note }}</span></li>
+          </ul>
+          <p v-if="o.note" class="nota-riga generale">{{ o.note }}</p>
           <div class="head-row">
             <strong>{{ o.r.definito || o.r.totale ? euro(o.r.totale) : '' }}</strong>
             <span class="badge" :class="PAGAMENTI[o.r.pagamento].cls">{{ PAGAMENTI[o.r.pagamento].label }}<template v-if="o.r.pagamento === 'acconto'"> &middot; mancano {{ euro(o.r.residuo) }}</template></span>

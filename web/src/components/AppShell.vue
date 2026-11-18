@@ -1,18 +1,21 @@
 <script setup>
-import { ref, computed, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, computed, watch, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { sezioni } from '../router'
 import { me, esci } from '../session'
 import { iniziali } from '../utenti'
 import Icona from './Icona.vue'
 
 const route = useRoute()
+const router = useRouter()
 const versione = __VERSIONE__
 const altroAperto = ref(false)
 const principali = sezioni.filter((s) => s.principale)
 const altre = sezioni.filter((s) => !s.principale)
 const altroAttivo = computed(() => altre.some((s) => route.path.startsWith(s.path)))
 watch(() => route.path, () => { altroAperto.value = false })
+const precarica = () => router.getRoutes().forEach((r) => { const c = r.components?.default; if (typeof c === 'function') c().catch(() => {}) })
+onMounted(() => (window.requestIdleCallback || ((f) => setTimeout(f, 1500)))(precarica))
 </script>
 
 <template>

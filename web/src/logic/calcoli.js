@@ -38,7 +38,10 @@ export function totaleRighe(righe) {
 
 export function riepilogoOrdine(o, db) {
   const righe = righeDi(o.id, db)
-  const { totale, definito } = totaleRighe(righe)
+  const somma = totaleRighe(righe)
+  const tf = num(o.totale_finale)
+  const totale = tf != null ? tf : somma.totale
+  const definito = tf != null ? true : somma.definito
   const incassato = r2(db.Movimenti.filter((m) => m.ordine_id === o.id && m.tipo === 'INCASSO').reduce((s, m) => s + Number(m.importo || 0), 0))
   const residuo = Math.max(0, r2(totale - incassato))
   let pagamento
@@ -46,7 +49,7 @@ export function riepilogoOrdine(o, db) {
   else if (residuo <= 0.009) pagamento = 'pagato'
   else if (incassato > 0) pagamento = 'acconto'
   else pagamento = 'da_incassare'
-  return { righe, totale, definito, incassato, residuo, pagamento }
+  return { righe, totale, definito, incassato, residuo, pagamento, sommaRighe: somma.totale, totaleFinale: tf != null }
 }
 
 /** Cassa comune e conti per persona. utente_id 'cassa' = soldi entrati direttamente in cassa. */
@@ -94,13 +97,15 @@ export function statistiche(db, da, a) {
   for (const o of ordini) {
     const c = o.canale || 'Altro'
     canali[c] = (canali[c] || 0) + 1
+    let vOrdine = 0
     for (const r of righeDi(o.id, db)) {
       const nome = db.Prodotti.find((p) => p.id === r.prodotto_id)?.nome || r.descrizione || 'Altro'
       const q = Number(r.quantita || 0)
       pezzi[nome] = (pezzi[nome] || 0) + q
-      venduto += (num(r.prezzo_unitario) || 0) * q
+      vOrdine += (num(r.prezzo_unitario) || 0) * q
       costiMateriali += (num(r.costo_unitario) || 0) * q
     }
+    venduto += num(o.totale_finale) ?? vOrdine
   }
   const incassato = db.Movimenti.filter((m) => m.tipo === 'INCASSO' && inP(m.data)).reduce((s, m) => s + Number(m.importo || 0), 0)
   const spese = db.Spese.filter((s) => inP(s.data)).reduce((t, s) => t + Number(s.costo || 0), 0)
@@ -111,6 +116,16 @@ export function statistiche(db, da, a) {
     utile: r2(incassato - spese), daIncassare: r2(daIncassare), margineMateriali: r2(venduto - costiMateriali),
     pezzi: ord(pezzi), canali: ord(canali)
   }
+}
+
+/** Conti per persona in forma leggibile: netto da versare (>0) o da ricevere (<0) e le voci aperte. */
+export function contiPersone(db) {
+  const { persone } = calcolaCassa(db)
+  return persone.map((p) => ({
+    ...p,
+    netto: r2(p.inMano - p.credito),
+    speseAperte: db.Spese.filter((s) => s.pagato_da === p.id && s.stato_rimborso === 'da_rimborsare')
+  })).sort((a, b) => Math.abs(b.netto) - Math.abs(a.netto))
 }
 
 /** quote: { idUtente: percentuale }. Arrotonda e assegna i centesimi residui al primo. */
@@ -165,6 +180,14 @@ export function costiProdotti(db, da, a, costoOrario) {
   const orario = num(costoOrario)
   const inP = (d) => (!da || d >= da) && (!a || d <= a)
   const ordiniP = new Set(db.Ordini.filter((o) => o.stato !== 'annullato' && inP(o.data)).map((o) => o.id))
+  // Con un totale finale (sconto/arrotondamento) i prezzi delle righe si scalano in proporzione
+  const fattore = {}
+  for (const o of db.Ordini) {
+    const tf = num(o.totale_finale)
+    if (tf == null) continue
+    const s = totaleRighe(righeDi(o.id, db)).totale
+    if (s > 0) fattore[o.id] = tf / s
+  }
   return db.Prodotti.map((p) => {
     const { prezzo, costo, completo, margine } = margineProdotto(p, db)
     const misura = tempoMisurato(p.id, db)
@@ -180,7 +203,7 @@ export function costiProdotti(db, da, a, costoOrario) {
       venduti += q
       const pu = num(r.prezzo_unitario)
       const cu = num(r.costo_unitario) ?? costo
-      if (pu != null) margineTotale += (pu - cu) * q
+      if (pu != null) margineTotale += (pu * (fattore[r.ordine_id] ?? 1) - cu) * q
     }
     return {
       id: p.id, nome: p.nome, attivo: p.attivo === true || p.attivo === 'TRUE',

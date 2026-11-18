@@ -18,8 +18,8 @@ var SCHEMA = {
   Materiali: ['id', 'nome', 'unita', 'costo_unitario', 'scorta', 'soglia_minima', 'attivo'],
   ProdottiMateriali: ['id', 'prodotto_id', 'materiale_id', 'quantita'],
   Clienti: ['id', 'nome', 'instagram', 'telefono', 'note', 'creato_il', 'creato_da'],
-  Ordini: ['id', 'numero', 'data', 'cliente_id', 'canale', 'stato', 'consegna_entro', 'assegnato_a', 'note', 'evento_id', 'consegnato_il', 'tempo_min', 'creato_il', 'creato_da'],
-  RigheOrdine: ['id', 'ordine_id', 'prodotto_id', 'variante_id', 'descrizione', 'quantita', 'prezzo_unitario', 'costo_unitario'],
+  Ordini: ['id', 'numero', 'data', 'cliente_id', 'canale', 'stato', 'consegna_entro', 'assegnato_a', 'note', 'evento_id', 'consegnato_il', 'tempo_min', 'totale_finale', 'creato_il', 'creato_da'],
+  RigheOrdine: ['id', 'ordine_id', 'prodotto_id', 'variante_id', 'descrizione', 'quantita', 'prezzo_unitario', 'costo_unitario', 'note'],
   Movimenti: ['id', 'data', 'tipo', 'importo', 'metodo', 'utente_id', 'ordine_id', 'spesa_id', 'evento_id', 'note', 'creato_il', 'creato_da'],
   Spese: ['id', 'data', 'descrizione', 'negozio', 'quantita', 'costo', 'pagato_da', 'stato_rimborso', 'evento_id', 'materiale_id', 'note', 'creato_il', 'creato_da'],
   Eventi: ['id', 'nome', 'luogo', 'data', 'checklist', 'note', 'creato_il', 'creato_da'],
@@ -178,6 +178,7 @@ var ACTIONS = {
   'ordine.tempo': function (p, me) { return tempoOrdine_(p, me); },
   'banco.vendita': function (p, me) { return venditaBanco_(p, me); },
   'spesa.rimborsa': function (p, me) { return rimborsaSpesa_(p, me); },
+  'conti.pareggia': function (p, me) { return pareggia_(p, me); },
   'foto.carica': function (p, me) { return caricaFoto_(p, me); },
   'foto.elimina': function (p, me) { return eliminaFoto_(p, me); },
   'foto.dati': function (p) {
@@ -199,7 +200,9 @@ function doPost(e) {
     var me = req.sessione ? authSessione_(req.sessione) : authenticate_(req.idToken);
     var fn = ACTIONS[req.action];
     if (!fn) throw apiError_('UNKNOWN_ACTION', 'Azione sconosciuta: ' + req.action);
-    return json_({ ok: true, data: fn(req.payload || {}, me) });
+    var out = fn(req.payload || {}, me);
+    if (req.conDati) out = { risultato: out, dati: datiTutti_() };
+    return json_({ ok: true, data: out });
   } catch (err) {
     if (!err.code) console.error(err && err.stack || err);
     return json_({ ok: false, error: err.code || 'INTERNAL', message: err.code ? err.message : 'Errore interno: ' + (err && err.message), fields: err.fields || null });
@@ -318,7 +321,11 @@ function eliminaGenerico_(entita, id, me) {
       deleteRows_('Varianti', function (r) { return r.prodotto_id === id; });
     }
     t.sheet.deleteRow(old._row);
-    log_(me, 'elimina', entita, id, old.nome || old.descrizione || '');
+    if (entita === 'movimento' && old.tipo === 'RIMBORSO' && old.spesa_id) {
+      var sp = readTable_('Spese').rows.filter(function (r) { return r.id === old.spesa_id; })[0];
+      if (sp) updateRow_('Spese', sp._row, { stato_rimborso: 'da_rimborsare' });
+    }
+    log_(me, 'elimina', entita, id, old.nome || old.descrizione || (old.tipo ? old.tipo + ' ' + fmtVal(old.importo) + ' \u20ac' : ''));
     return { id: id };
   });
 }
@@ -340,11 +347,13 @@ function salvaOrdine_(p, me) {
   var err = validateRighe(righe);
   if (err) throw apiError_('VALIDATION', err);
   if (o.stato && STATI_ORDINE.indexOf(o.stato) < 0) throw apiError_('VALIDATION', 'Stato non valido');
+  var tf = o.totale_finale === '' || o.totale_finale == null ? '' : Number(String(o.totale_finale).replace(',', '.'));
+  if (tf !== '' && (isNaN(tf) || tf < 0)) throw apiError_('VALIDATION', 'Totale finale non valido');
   return withLock_(function () {
     var clienteId = salvaCliente_(p.cliente, me);
     var dati = {
       data: o.data || oggi_(), cliente_id: clienteId, canale: o.canale || '', stato: o.stato || 'lavorazione',
-      consegna_entro: o.consegna_entro || '', assegnato_a: o.assegnato_a || '', note: String(o.note || '').trim(), evento_id: o.evento_id || ''
+      consegna_entro: o.consegna_entro || '', assegnato_a: o.assegnato_a || '', note: String(o.note || '').trim(), evento_id: o.evento_id || '', totale_finale: tf === '' ? '' : round2(tf)
     };
     var id = o.id;
     if (!id) {
@@ -391,7 +400,8 @@ function scriviRighe_(ordineId, righe) {
       id: 'r' + (start - righe.length + 1 + i), ordine_id: ordineId, prodotto_id: r.prodotto_id || '', variante_id: r.variante_id || '',
       descrizione: String(r.descrizione || '').trim(), quantita: Number(r.quantita),
       prezzo_unitario: r.prezzo_unitario === '' || r.prezzo_unitario == null ? '' : round2(r.prezzo_unitario),
-      costo_unitario: r.costo_unitario === '' || r.costo_unitario == null ? '' : round2(r.costo_unitario)
+      costo_unitario: r.costo_unitario === '' || r.costo_unitario == null ? '' : round2(r.costo_unitario),
+      note: String(r.note || '').trim().slice(0, 500)
     };
     return h.map(function (k) { return o[k] === undefined ? '' : o[k]; });
   });
@@ -461,6 +471,25 @@ function rimborsaSpesa_(p, me) {
     updateRow_('Spese', s._row, { stato_rimborso: 'rimborsato' });
     log_(me, 'modifica', 'spesa', s.id, s.descrizione + ' \u00b7 rimborsata');
     return { id: s.id };
+  });
+}
+
+/** Mette in pari una persona: versa in cassa quello che ha in mano e rimborsa tutte le sue spese aperte. */
+function pareggia_(p, me) {
+  if (!p.utente_id || p.utente_id === 'cassa') throw apiError_('VALIDATION', 'Persona non indicata');
+  return withLock_(function () {
+    var versa = round2(Number(p.versamento) || 0), fatte = [];
+    if (versa > 0) appendRow_('Movimenti', { id: nextId_('mv', 'Movimenti'), data: oggi_(), tipo: 'VERSAMENTO', importo: versa, metodo: p.metodo || 'contanti', utente_id: p.utente_id, note: 'Messa in pari', creato_il: new Date(), creato_da: me.id });
+    var spese = readTable_('Spese');
+    (p.spese || []).forEach(function (id) {
+      var s = spese.rows.filter(function (r) { return r.id === id && r.pagato_da === p.utente_id && r.stato_rimborso === 'da_rimborsare'; })[0];
+      if (!s) return;
+      appendRow_('Movimenti', { id: nextId_('mv', 'Movimenti'), data: oggi_(), tipo: 'RIMBORSO', importo: round2(s.costo), metodo: p.metodo || 'contanti', utente_id: s.pagato_da, spesa_id: s.id, note: 'Messa in pari', creato_il: new Date(), creato_da: me.id });
+      updateRow_('Spese', s._row, { stato_rimborso: 'rimborsato' });
+      fatte.push(s.id);
+    });
+    log_(me, 'modifica', 'conti', p.utente_id, 'messa in pari: versati ' + fmtVal(versa) + ' \u20ac, rimborsate ' + fatte.length + ' spese');
+    return { versato: versa, rimborsate: fatte.length };
   });
 }
 

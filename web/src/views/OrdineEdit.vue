@@ -3,7 +3,7 @@ import { ref, reactive, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { db, pronto, azione } from '../store'
 import { me } from '../session'
-import { costoProdotto, totaleRighe, euro, oggi, num } from '../logic/calcoli'
+import { costoProdotto, totaleRighe, euro, oggi, num, r2 } from '../logic/calcoli'
 import { CANALI } from '../stati'
 import { notify } from '../toast'
 import Seg from '../components/Seg.vue'
@@ -13,7 +13,7 @@ const route = useRoute()
 const router = useRouter()
 const id = route.params.id || ''
 const da = route.query.da || ''
-const form = reactive({ id, data: oggi(), canale: 'Passaparola', stato: 'lavorazione', consegna_entro: '', assegnato_a: '', note: '', evento_id: '' })
+const form = reactive({ id, data: oggi(), canale: 'Passaparola', stato: 'lavorazione', consegna_entro: '', assegnato_a: '', note: '', evento_id: '', totale_finale: '' })
 const cliente = reactive({ id: '', nome: '', instagram: '', telefono: '' })
 const righe = ref([])
 const salvando = ref(false)
@@ -24,10 +24,11 @@ const prodottiAttivi = computed(() => db.Prodotti.filter((p) => p.attivo === tru
 const variantiDi = (pid) => db.Varianti.filter((v) => v.prodotto_id === pid && v.attivo !== false)
 const utentiAttivi = computed(() => db.Utenti.filter((u) => u.attivo))
 const tot = computed(() => totaleRighe(righe.value))
+const sconto = computed(() => { const tf = num(form.totale_finale); return tf != null && tot.value.totale ? r2(tot.value.totale - tf) : 0 })
 
 function nuovaRiga() {
   const p = prodottiAttivi.value[0]
-  return { prodotto_id: p?.id || '', variante_id: '', descrizione: '', quantita: 1, prezzo_unitario: p ? (num(p.prezzo) ?? '') : '', costo_unitario: p ? costoProdotto(p.id, db).costo : '' }
+  return { prodotto_id: p?.id || '', variante_id: '', descrizione: '', note: '', quantita: 1, prezzo_unitario: p ? (num(p.prezzo) ?? '') : '', costo_unitario: p ? costoProdotto(p.id, db).costo : '' }
 }
 
 function aggiornaPrezzo(r) {
@@ -51,11 +52,11 @@ function inizializza() {
   const srcId = id || da
   const src = srcId && db.Ordini.find((o) => o.id === srcId)
   if (src) {
-    if (id) Object.assign(form, { data: src.data, canale: src.canale, stato: src.stato, consegna_entro: src.consegna_entro || '', assegnato_a: src.assegnato_a || '', note: src.note || '', evento_id: src.evento_id || '' })
+    if (id) Object.assign(form, { data: src.data, canale: src.canale, stato: src.stato, consegna_entro: src.consegna_entro || '', assegnato_a: src.assegnato_a || '', note: src.note || '', evento_id: src.evento_id || '', totale_finale: src.totale_finale ?? '' })
     else Object.assign(form, { canale: src.canale, note: src.note || '' })
     const c = db.Clienti.find((x) => x.id === src.cliente_id)
     if (c) Object.assign(cliente, { id: c.id, nome: c.nome, instagram: c.instagram || '', telefono: c.telefono || '' })
-    righe.value = db.RigheOrdine.filter((r) => r.ordine_id === srcId).map((r) => ({ prodotto_id: r.prodotto_id, variante_id: r.variante_id || '', descrizione: r.descrizione || '', quantita: r.quantita, prezzo_unitario: r.prezzo_unitario, costo_unitario: r.costo_unitario }))
+    righe.value = db.RigheOrdine.filter((r) => r.ordine_id === srcId).map((r) => ({ prodotto_id: r.prodotto_id, variante_id: r.variante_id || '', descrizione: r.descrizione || '', quantita: r.quantita, prezzo_unitario: r.prezzo_unitario, costo_unitario: r.costo_unitario, note: r.note || '' }))
   }
   if (!righe.value.length) righe.value = [nuovaRiga()]
   if (!id && !form.assegnato_a) form.assegnato_a = ''
@@ -117,6 +118,7 @@ async function salva() {
               </label>
               <label v-if="!r.prodotto_id" class="field"><span>Descrizione</span><input v-model="r.descrizione" type="text"></label>
             </div>
+            <label class="field"><span>Note per questo prodotto</span><input v-model="r.note" type="text" placeholder="Frase, colore, nome&hellip;"></label>
             <div class="grid3">
               <label class="field"><span>Quantit&agrave;</span><input v-model.number="r.quantita" type="number" min="1" inputmode="numeric"></label>
               <label class="field"><span>Prezzo cad. &euro;</span><input v-model="r.prezzo_unitario" type="text" inputmode="decimal" placeholder="da definire"></label>
@@ -125,7 +127,12 @@ async function salva() {
           </div>
         </TransitionGroup>
         <button type="button" class="btn ghost" @click="righe.push(nuovaRiga())"><Icona nome="piu" :size="18" /> Aggiungi prodotto</button>
-        <div class="tot"><span>Totale</span><strong>{{ tot.definito || tot.totale ? euro(tot.totale) : 'Da definire' }}</strong></div>
+        <div class="tot"><span>Somma prodotti</span><strong>{{ tot.definito || tot.totale ? euro(tot.totale) : 'Da definire' }}</strong></div>
+        <label class="field"><span>Totale finale &euro; (solo se diverso: sconto o arrotondamento)</span>
+          <input v-model="form.totale_finale" type="text" inputmode="decimal" :placeholder="tot.totale ? String(tot.totale) : 'es. 25'">
+        </label>
+        <small v-if="sconto > 0" class="pos">Sconto {{ euro(sconto) }}</small>
+        <small v-else-if="sconto < 0" class="muted">Maggiorazione {{ euro(-sconto) }}</small>
       </div>
 
       <div class="card">
@@ -139,7 +146,7 @@ async function salva() {
             <option v-for="u in utentiAttivi" :key="u.id" :value="u.id">{{ u.nome }}{{ u.id === me.id ? ' (tu)' : '' }}</option>
           </select>
         </label>
-        <label class="field"><span>Note e personalizzazione</span><textarea v-model="form.note" rows="3" placeholder="Frase, colore, nome&hellip;"></textarea></label>
+        <label class="field"><span>Note generali sull&rsquo;ordine (facoltative)</span><textarea v-model="form.note" rows="3" placeholder="Frase, colore, nome&hellip;"></textarea></label>
       </div>
       <p v-if="errore" class="error shake">{{ errore }}</p>
       <button class="btn full" :disabled="salvando">{{ salvando ? 'Salvataggio\u2026' : 'Salva ordine' }}</button>

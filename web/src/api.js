@@ -4,6 +4,9 @@ import { token, sessione, setSessione, ensureFresh, expire, logout } from './aut
 
 // Operazioni in corso: alimentano la barra di caricamento globale
 export const inCorso = ref(0)
+export const scritture = ref(0)
+const LETTURE = new Set(['dati', 'whoami', 'utenti.list', 'attivita.list', 'catalogo', 'foto.dati'])
+const inVolo = new Map()
 export const etichetta = ref('')
 const ETICHETTE = {
   dati: 'Aggiorno i dati\u2026', whoami: 'Verifico l\u2019accesso\u2026', salva: 'Salvo\u2026', elimina: 'Elimino\u2026',
@@ -19,13 +22,24 @@ export class ApiError extends Error {
   constructor(code, message, fields) { super(message || code); this.code = code; this.fields = fields || null }
 }
 
-export async function call(action, payload = {}, retry = true) {
+export function call(action, payload = {}, retry = true, opz = {}) {
+  // La stessa operazione gia' in corso non parte una seconda volta (doppio tocco)
+  const chiave = action + '|' + JSON.stringify(payload) + '|' + !!opz.conDati
+  if (inVolo.has(chiave)) return inVolo.get(chiave)
+  const scrittura = !LETTURE.has(action)
   inCorso.value++
+  if (scrittura) scritture.value++
   etichetta.value = ETICHETTE[action] || 'Attendere\u2026'
-  try { return await esegui(action, payload, retry) } finally { inCorso.value = Math.max(0, inCorso.value - 1) }
+  const p = esegui(action, payload, retry, opz).finally(() => {
+    inCorso.value = Math.max(0, inCorso.value - 1)
+    if (scrittura) scritture.value = Math.max(0, scritture.value - 1)
+    inVolo.delete(chiave)
+  })
+  inVolo.set(chiave, p)
+  return p
 }
 
-async function esegui(action, payload, retry) {
+async function esegui(action, payload, retry, opz) {
   const conSessione = !!sessione.value
   if (!conSessione) await ensureFresh()
   let res
@@ -33,7 +47,7 @@ async function esegui(action, payload, retry) {
     res = await fetch(import.meta.env.VITE_API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action, payload, idToken: conSessione ? '' : token.value, sessione: sessione.value })
+      body: JSON.stringify({ action, payload, idToken: conSessione ? '' : token.value, sessione: sessione.value, conDati: !!opz.conDati })
     })
   } catch {
     throw new ApiError('NETWORK', 'Connessione assente: riprova')
@@ -45,7 +59,7 @@ async function esegui(action, payload, retry) {
   const authErr = body.error === 'BAD_TOKEN' || body.error === 'NO_TOKEN' || body.error === 'SESSION_EXPIRED'
   if (authErr && retry && !conSessione) {
     expire()
-    if (await ensureFresh()) return call(action, payload, false)
+    if (await ensureFresh()) return esegui(action, payload, false, opz)
   }
   if (authErr || body.error === 'NOT_ALLOWED') logout()
   throw new ApiError(body.error, body.message, body.fields)

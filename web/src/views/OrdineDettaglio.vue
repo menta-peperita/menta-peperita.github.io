@@ -1,7 +1,7 @@
 <script setup>
 import { ref, reactive, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { db, pronto, azione, salva, nomeProdotto, nomeUtente, fotoUrl } from '../store'
+import { db, pronto, azione, salva, elimina, nomeProdotto, nomeUtente, fotoUrl } from '../store'
 import { me } from '../session'
 import { call } from '../api'
 import { riepilogoOrdine, euro, fmtData, oggi, telefonoWa, testoMessaggio } from '../logic/calcoli'
@@ -43,14 +43,20 @@ async function salvaTempo(minuti) {
 async function cambiaStato(stato) {
   if (stato === o.value.stato) return
   if (stato === 'pronto' && !Number(o.value.tempo_min)) apriTempo()
+  const prima = o.value.stato
+  o.value.stato = stato
   occupato.value = true
-  try { await azione('ordine.stato', { id, stato }); notify('Stato: ' + STATI[stato].label) } catch (e) { notify(e.message, 'err') } finally { occupato.value = false }
+  try { await azione('ordine.stato', { id, stato }); notify('Stato: ' + STATI[stato].label) } catch (e) { o.value.stato = prima; notify(e.message, 'err') } finally { occupato.value = false }
 }
 
 // ---- pagamento
 const pag = reactive({ aperto: false, importo: '', metodo: 'contanti', utente_id: '', data: oggi() })
 const chiOpz = computed(() => [{ value: 'cassa', label: 'Cassa comune' }, ...db.Utenti.filter((u) => u.attivo).map((u) => ({ value: u.id, label: u.nome }))])
 function apriPagamento() { Object.assign(pag, { aperto: true, importo: r.value.residuo || '', metodo: 'contanti', utente_id: me.value.id, data: oggi() }) }
+async function eliminaPagamento(m) {
+  if (!confirm('Eliminare il pagamento di ' + euro(m.importo) + ' del ' + fmtData(m.data) + '?')) return
+  try { await elimina('movimento', m.id); notify('Pagamento eliminato') } catch (e) { notify(e.message, 'err') }
+}
 async function salvaPagamento() {
   occupato.value = true
   try {
@@ -158,11 +164,12 @@ async function eliminaOrdine() {
 
       <div class="card">
         <h2 class="h2">Prodotti</h2>
-        <div v-for="(x, i) in r.righe" :key="i" class="head-row">
+        <div v-for="(x, i) in r.righe" :key="i" class="riga-det"><div class="head-row">
           <span>{{ x.quantita }} &times; {{ nomeProdotto(x.prodotto_id) || x.descrizione }}<span v-if="x.variante_id" class="muted"> &middot; {{ db.Varianti.find((v) => v.id === x.variante_id)?.nome }}</span></span>
           <span>{{ x.prezzo_unitario === '' ? 'da definire' : euro(x.prezzo_unitario * x.quantita) }}</span>
-        </div>
-        <div class="tot"><span>Totale</span><strong>{{ r.definito || r.totale ? euro(r.totale) : 'Da definire' }}</strong></div>
+        </div><p v-if="x.note" class="nota-riga">{{ x.note }}</p></div>
+        <div v-if="r.totaleFinale" class="head-row muted"><span>Somma prodotti</span><span>{{ euro(r.sommaRighe) }}</span></div>
+        <div class="tot"><span>{{ r.totaleFinale ? 'Totale finale' : 'Totale' }}</span><strong>{{ r.definito || r.totale ? euro(r.totale) : 'Da definire' }}</strong></div>
       </div>
 
       <div class="card">
@@ -170,7 +177,7 @@ async function eliminaOrdine() {
         <TransitionGroup name="list" tag="div" class="col">
           <div v-for="m in pagamenti" :key="m.id" class="head-row">
             <span>{{ fmtData(m.data) }} &middot; {{ m.metodo || 'pagamento' }} &middot; a {{ nomeUtente(m.utente_id) }}</span>
-            <strong>{{ euro(m.importo) }}</strong>
+            <span class="azioni-riga"><strong>{{ euro(m.importo) }}</strong><button v-if="me.ruolo === 'Titolare'" class="icon-btn" aria-label="Elimina pagamento" @click="eliminaPagamento(m)"><Icona nome="cestino" :size="18" /></button></span>
           </div>
         </TransitionGroup>
         <div v-if="r.residuo > 0" class="tot danger"><span>Resta da incassare</span><strong>{{ euro(r.residuo) }}</strong></div>
